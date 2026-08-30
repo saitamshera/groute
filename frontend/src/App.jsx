@@ -1,0 +1,100 @@
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import useAuthStore from './store/authStore.js';
+
+import Navbar from './components/common/Navbar.jsx';
+import Login from './pages/Login.jsx';
+import Register from './pages/Register.jsx';
+import Dashboard from './pages/Dashboard.jsx';
+import GroupDetails from './pages/GroupDetails.jsx';
+import CreateTrip from './pages/CreateTrip.jsx';
+import TripDashboard from './pages/TripDashboard.jsx';
+import Settings from './pages/Settings.jsx';
+
+function ProtectedRoute({ children }) {
+  const { isAuthenticated, isLoading } = useAuthStore();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">
+        <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
+export function App() {
+  const { initAuth } = useAuthStore();
+
+  useEffect(() => {
+    initAuth();
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
+        <Navbar />
+        <main className="flex-1">
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+
+            {/* Protected Routes */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/groups/:groupId"
+              element={
+                <ProtectedRoute>
+                  <GroupDetails />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/trips/new"
+              element={
+                <ProtectedRoute>
+                  <CreateTrip />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/trips/:tripId"
+              element={
+                <ProtectedRoute>
+                  <TripDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </main>
+      </div>
+    </BrowserRouter>
+  );
+}
+
+export default App;
