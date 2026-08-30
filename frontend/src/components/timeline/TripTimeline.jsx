@@ -1,33 +1,33 @@
 import React, { useState } from 'react';
-import { Clock, AlertTriangle, MapPin, CheckCircle2, Navigation, Flag, Filter, UserCheck, ShieldAlert } from 'lucide-react';
+import { Clock, AlertTriangle, MapPin, CheckCircle2, Navigation, Flag, UserCheck } from 'lucide-react';
 import useTripStore from '../../store/tripStore.js';
-import { formatTime, timeAgo } from '../../utils/formatters.js';
+import { formatTime } from '../../utils/formatters.js';
 
 export function TripTimeline() {
-  const { events, setSelectedMemberId, setSelectedStop, stops } = useTripStore();
+  const { events, focusMember, focusStop, stops } = useTripStore();
   const [filter, setFilter] = useState('ALL'); // 'ALL' | 'STOPS' | 'ALERTS'
 
   const getEventVisuals = (event) => {
     switch (event.event_type) {
       case 'TRIP_STARTED':
         return {
-          icon: <Navigation className="w-4 h-4 text-emerald-400" />,
-          badgeBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+          icon: <Navigation className="w-3.5 h-3.5 text-[#1e8e3e]" />,
+          badgeBg: 'bg-[#e6f4ea] text-[#137333] border-[#ceead6]',
           title: 'Trip Started',
-          description: `${event.user_name} initiated the trip.`
+          description: `${event.user_name} initiated convoy travel.`
         };
       case 'STOP_STARTED':
         return {
-          icon: <span className="text-base leading-none">🛑</span>,
-          badgeBg: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+          icon: <span className="text-sm leading-none">🛑</span>,
+          badgeBg: 'bg-[#fce8e6] text-[#c5221f] border-[#fad2cf]',
           title: `${event.user_name} stopped`,
           description: `Stopped at ${event.location_name || event.metadata?.locationName || 'Highway Rest Point'}`
         };
       case 'STOP_ENDED':
         const durationText = event.metadata?.durationMinutes ? `${event.metadata.durationMinutes} min` : 'a short break';
         return {
-          icon: <Navigation className="w-4 h-4 text-blue-400" />,
-          badgeBg: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+          icon: <Navigation className="w-3.5 h-3.5 text-[#1a73e8]" />,
+          badgeBg: 'bg-[#e8f0fe] text-[#1a73e8] border-[#d2e3fc]',
           title: `${event.user_name} resumed driving`,
           description: `Resumed travel after ${durationText} at ${event.location_name || 'Rest Area'}`
         };
@@ -35,89 +35,96 @@ export function TripTimeline() {
       case 'GROUP_SPLIT':
         const dist = event.metadata?.distanceKm || '5+';
         return {
-          icon: <AlertTriangle className="w-4 h-4 text-amber-400" />,
-          badgeBg: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-          title: 'Group Separation Alert',
-          description: `${event.user_name} is ${dist} km behind the group center.`
+          icon: <AlertTriangle className="w-3.5 h-3.5 text-[#f9ab00]" />,
+          badgeBg: 'bg-[#fef7e0] text-[#b06000] border-[#feefc3]',
+          title: 'Separation Alert',
+          description: `${event.user_name} is ${dist} km behind group centroid.`
         };
       case 'MEMBER_REJOINED':
         return {
-          icon: <CheckCircle2 className="w-4 h-4 text-cyan-400" />,
-          badgeBg: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30',
+          icon: <CheckCircle2 className="w-3.5 h-3.5 text-[#1e8e3e]" />,
+          badgeBg: 'bg-[#e6f4ea] text-[#137333] border-[#ceead6]',
           title: 'Member Rejoined',
-          description: `${event.user_name} is back with the group convoy!`
+          description: `${event.user_name} rejoined the convoy convoy.`
         };
       case 'TRIP_COMPLETED':
         return {
-          icon: <Flag className="w-4 h-4 text-purple-400" />,
-          badgeBg: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
+          icon: <Flag className="w-3.5 h-3.5 text-[#7627bb]" />,
+          badgeBg: 'bg-[#f3e8fd] text-[#7627bb] border-[#e9d5ff]',
           title: 'Destination Reached',
-          description: `Trip marked completed. Group arrived safely.`
+          description: 'Group reached destination safely.'
         };
       default:
         return {
-          icon: <UserCheck className="w-4 h-4 text-slate-400" />,
-          badgeBg: 'bg-slate-800 text-slate-400 border-slate-700',
-          title: event.event_type.replace('_', ' '),
+          icon: <UserCheck className="w-3.5 h-3.5 text-[#5f6368]" />,
+          badgeBg: 'bg-[#f1f3f4] text-[#5f6368] border-[#dadce0]',
+          title: event.event_type.replace(/_/g, ' '),
           description: event.metadata?.message || 'Activity recorded'
         };
     }
   };
 
-  const filteredEvents = events.filter(e => {
+  const filteredEvents = events.filter((e) => {
     if (filter === 'STOPS') return e.event_type === 'STOP_STARTED' || e.event_type === 'STOP_ENDED';
     if (filter === 'ALERTS') return e.event_type === 'MEMBER_FELL_BEHIND' || e.event_type === 'GROUP_SPLIT';
     return true;
   });
 
   const handleEventClick = (event) => {
-    if (event.user_id) {
-      setSelectedMemberId(event.user_id);
-    }
     if (event.event_type === 'STOP_STARTED' || event.event_type === 'STOP_ENDED') {
-      const matchedStop = stops.find(s => s.user_id === event.user_id || s.id === event.metadata?.stopId);
+      const matchedStop = stops.find((s) => s.user_id === event.user_id || s.id === event.metadata?.stopId);
       if (matchedStop) {
-        setSelectedStop(matchedStop);
+        focusStop(matchedStop);
+        return;
       }
+    }
+    if (event.user_id) {
+      focusMember(event.user_id);
     }
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900/90 border border-slate-800/90 rounded-2xl overflow-hidden backdrop-blur-md">
-      {/* Header */}
-      <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+    <div className="flex flex-col h-full overflow-hidden bg-white">
+      {/* Filter Header */}
+      <div className="p-3 sm:p-4 border-b border-[#dadce0] flex items-center justify-between bg-[#f8f9fa]">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-brand-500/10 text-brand-400">
+          <div className="p-1.5 rounded-full bg-[#e8f0fe] text-[#1a73e8]">
             <Clock className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white">Live Trip Timeline</h3>
-            <p className="text-[11px] text-slate-400">Auto-detected travel events</p>
+            <h3 className="text-xs sm:text-sm font-bold text-[#202124]">Activity Feed</h3>
+            <p className="text-[10px] text-[#5f6368]">Live convoy trip history</p>
           </div>
         </div>
 
         {/* Filter Pills */}
-        <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-lg border border-slate-800 text-xs">
+        <div className="flex items-center gap-1 bg-[#f1f3f4] p-1 rounded-full text-xs border border-[#dadce0]">
           <button
             onClick={() => setFilter('ALL')}
-            className={`px-2 py-0.5 rounded font-medium transition-colors ${
-              filter === 'ALL' ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-white'
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all ${
+              filter === 'ALL'
+                ? 'bg-white text-[#1a73e8] shadow-xs'
+                : 'text-[#5f6368] hover:text-[#202124]'
             }`}
           >
             All ({events.length})
           </button>
           <button
             onClick={() => setFilter('STOPS')}
-            className={`px-2 py-0.5 rounded font-medium transition-colors ${
-              filter === 'STOPS' ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-white'
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all ${
+              filter === 'STOPS'
+                ? 'bg-white text-[#1a73e8] shadow-xs'
+                : 'text-[#5f6368] hover:text-[#202124]'
             }`}
           >
             Stops
           </button>
           <button
             onClick={() => setFilter('ALERTS')}
-            className={`px-2 py-0.5 rounded font-medium transition-colors ${
-              filter === 'ALERTS' ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-white'
+            className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold transition-all ${
+              filter === 'ALERTS'
+                ? 'bg-white text-[#1a73e8] shadow-xs'
+                : 'text-[#5f6368] hover:text-[#202124]'
             }`}
           >
             Alerts
@@ -125,16 +132,18 @@ export function TripTimeline() {
         </div>
       </div>
 
-      {/* Timeline Scroll Area */}
+      {/* Timeline List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {filteredEvents.length === 0 ? (
-          <div className="h-40 flex flex-col items-center justify-center text-center p-4 text-slate-500">
-            <Clock className="w-8 h-8 mb-2 opacity-30" />
-            <p className="text-sm font-medium">No timeline events recorded yet</p>
-            <p className="text-xs text-slate-600 mt-0.5">Events like stops, separation alerts, and progress will appear in real time</p>
+          <div className="h-44 flex flex-col items-center justify-center text-center p-4 text-[#80868b]">
+            <Clock className="w-8 h-8 mb-2 opacity-40" />
+            <p className="text-xs font-semibold text-[#5f6368]">No activity recorded yet</p>
+            <p className="text-[11px] text-[#80868b] mt-1 max-w-xs">
+              Trip milestones, stops, and convoy separation alerts will appear here in real time.
+            </p>
           </div>
         ) : (
-          <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
+          <div className="relative pl-6 space-y-3.5 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-[#dadce0]">
             {filteredEvents.map((event, idx) => {
               const visuals = getEventVisuals(event);
               return (
@@ -144,33 +153,33 @@ export function TripTimeline() {
                   className="relative group cursor-pointer transition-transform hover:-translate-y-0.5"
                 >
                   {/* Timeline Dot */}
-                  <div className="absolute -left-6 top-1.5 w-4 h-4 rounded-full bg-slate-900 border-2 border-slate-700 group-hover:border-brand-400 flex items-center justify-center transition-colors">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 group-hover:bg-brand-400" />
+                  <div className="absolute -left-6 top-1.5 w-4 h-4 rounded-full bg-white border-2 border-[#dadce0] group-hover:border-[#1a73e8] flex items-center justify-center transition-colors">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#80868b] group-hover:bg-[#1a73e8]" />
                   </div>
 
                   {/* Card Content */}
-                  <div className="bg-slate-850/90 hover:bg-slate-800 border border-slate-800/80 hover:border-slate-700 p-3 rounded-xl transition-all shadow-sm">
+                  <div className="bg-white hover:bg-[#f8f9fa] border border-[#dadce0] hover:border-[#1a73e8] p-3 rounded-2xl transition-all shadow-xs">
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <div className="flex items-center gap-1.5">
-                        <span className={`p-1 rounded-md border text-xs flex items-center justify-center ${visuals.badgeBg}`}>
+                        <span className={`p-1 rounded-lg border text-xs flex items-center justify-center ${visuals.badgeBg}`}>
                           {visuals.icon}
                         </span>
-                        <span className="text-xs font-bold text-slate-200 group-hover:text-brand-300 transition-colors">
+                        <span className="text-xs font-bold text-[#202124] group-hover:text-[#1a73e8] transition-colors">
                           {visuals.title}
                         </span>
                       </div>
-                      <span className="text-[11px] font-mono text-slate-500 whitespace-nowrap">
+                      <span className="text-[10px] font-mono text-[#80868b] whitespace-nowrap">
                         {formatTime(event.created_at)}
                       </span>
                     </div>
 
-                    <p className="text-xs text-slate-400 pl-6 leading-relaxed">
+                    <p className="text-xs text-[#5f6368] pl-6 leading-relaxed">
                       {visuals.description}
                     </p>
 
                     {event.location_name && (
-                      <div className="mt-2 pl-6 flex items-center gap-1 text-[11px] text-slate-500 font-medium">
-                        <MapPin className="w-3 h-3 text-brand-400" />
+                      <div className="mt-1.5 pl-6 flex items-center gap-1 text-[10px] text-[#5f6368] font-medium">
+                        <MapPin className="w-3 h-3 text-[#1a73e8] shrink-0" />
                         <span className="truncate">{event.location_name}</span>
                       </div>
                     )}

@@ -9,27 +9,40 @@ export default {
     extend: {
       colors: {
         brand: {
-          50: '#eef6ff',
-          100: '#d9ebff',
-          200: '#bcdbff',
-          300: '#8ec2ff',
-          400: '#599eff',
-          500: '#2f74ff',
-          600: '#134ef5',
-          700: '#0c3be1',
-          800: '#1031b6',
-          900: '#132c8e',
-          950: '#0e1b56'
+          50: '#e8f0fe',
+          100: '#d2e3fc',
+          200: '#aecbfa',
+          300: '#8ab4f8',
+          400: '#669df6',
+          500: '#4285f4',
+          600: '#1a73e8', // Google Maps Primary Blue
+          700: '#1967d2',
+          800: '#185abc',
+          900: '#174ea6',
+          950: '#0d2d6c'
         },
-        slate: {
-          850: '#151e2e',
-          900: '#0f172a',
-          950: '#080c16'
+        gmap: {
+          bg: '#f8f9fa',
+          surface: '#ffffff',
+          border: '#e0e3e7',
+          'border-light': '#dadce0',
+          text: '#202124',
+          'text-secondary': '#5f6368',
+          'text-muted': '#80868b',
+          blue: '#1a73e8',
+          'blue-hover': '#1557d0',
+          'blue-light': '#e8f0fe',
+          green: '#1e8e3e',
+          'green-light': '#e6f4ea',
+          yellow: '#f9ab00',
+          'yellow-light': '#fef7e0',
+          red: '#d93025',
+          'red-light': '#fce8e6'
         }
       },
       fontFamily: {
-        sans: ['Plus Jakarta Sans', 'Outfit', 'Inter', 'system-ui', 'sans-serif'],
-        display: ['Outfit', 'Plus Jakarta Sans', 'system-ui', 'sans-serif']
+        sans: ['Plus Jakarta Sans', 'Outfit', 'Inter', '-apple-system', 'sans-serif'],
+        display: ['Outfit', 'Plus Jakarta Sans', '-apple-system', 'sans-serif']
       },
       animation: {
         'pulse-subtle': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

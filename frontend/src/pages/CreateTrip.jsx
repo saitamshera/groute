@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Navigation, MapPin, Calendar, Clock, ArrowRight, ArrowLeft, Route, Check } from 'lucide-react';
+import { Navigation, MapPin, Calendar, Clock, ArrowRight, ArrowLeft, Route, Check, Plus, UserPlus, Sparkles } from 'lucide-react';
 import api from '../services/api.js';
+import CreateGroupModal from './CreateGroupModal.jsx';
+import JoinGroupModal from './JoinGroupModal.jsx';
 
 // Popular road trip presets for quick 1-click selection
 const tripPresets = [
@@ -58,22 +60,61 @@ export function CreateTrip() {
   const [duration, setDuration] = useState('11h 30m');
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    async function fetchGroups() {
-      try {
-        const data = await api.getGroups();
-        setGroups(data.groups || []);
-        if (!groupId && data.groups && data.groups.length > 0) {
-          setGroupId(data.groups[0].id);
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
+  const [isJoinGroupOpen, setIsJoinGroupOpen] = useState(false);
+
+  const fetchGroups = async () => {
+    setIsLoadingGroups(true);
+    try {
+      const data = await api.getGroups();
+      const loadedGroups = data.groups || [];
+      setGroups(loadedGroups);
+      if (loadedGroups.length > 0) {
+        if (!groupId || !loadedGroups.some(g => g.id === groupId)) {
+          setGroupId(loadedGroups[0].id);
         }
-      } catch (err) {
-        console.error('Failed to load groups:', err);
       }
+    } catch (err) {
+      console.error('Failed to load groups:', err);
+    } finally {
+      setIsLoadingGroups(false);
     }
+  };
+
+  useEffect(() => {
     fetchGroups();
   }, []);
+
+  const handleGroupCreatedOrJoined = (newGroup) => {
+    if (newGroup && newGroup.id) {
+      setGroups((prev) => {
+        const exists = prev.some(g => g.id === newGroup.id);
+        if (exists) return prev;
+        return [newGroup, ...prev];
+      });
+      setGroupId(newGroup.id);
+      setError('');
+    }
+    fetchGroups();
+  };
+
+  const handleQuickCreateGroup = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const data = await api.createGroup({ name: 'Himalayan Convoy 2026' });
+      if (data.group) {
+        handleGroupCreatedOrJoined(data.group);
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to create group');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleApplyPreset = (preset) => {
     setTripName(preset.name);
@@ -90,7 +131,7 @@ export function CreateTrip() {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!groupId) {
-      setError('Please select or create a group first.');
+      setError('Please select or create a travel group first.');
       return;
     }
 
@@ -103,41 +144,53 @@ export function CreateTrip() {
         name: tripName.trim(),
         origin: origin.trim(),
         destination: destination.trim(),
-        origin_lat: originLat,
-        origin_lng: originLng,
-        destination_lat: destLat,
-        destination_lng: destLng,
+        origin_lat: Number(originLat),
+        origin_lng: Number(originLng),
+        destination_lat: Number(destLat),
+        destination_lng: Number(destLng),
         distance,
         estimated_duration: duration
       });
 
+      if (!data || !data.trip || !data.trip.id) {
+        throw new Error('Trip was created but no trip ID was returned by server.');
+      }
+
+      // Automatically activate trip for immediate live convoy tracking
+      try {
+        await api.startTrip(data.trip.id);
+      } catch (startErr) {
+        console.warn('Trip created, start warning:', startErr);
+      }
+
       navigate(`/trips/${data.trip.id}`);
     } catch (err) {
-      setError(err.message || 'Failed to create trip.');
+      console.error('[CreateTrip] Error creating trip:', err);
+      setError(err.message || 'Failed to create trip. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link
           to="/dashboard"
-          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+          className="p-2 rounded-full bg-white hover:bg-[#f1f3f4] text-[#5f6368] border border-[#dadce0] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div>
-          <span className="text-xs uppercase tracking-wider text-slate-400 font-semibold">New Journey</span>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">Plan Group Road Trip</h1>
+          <span className="text-xs uppercase tracking-wider text-[#5f6368] font-bold">New Journey</span>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#202124]">Plan Group Road Trip</h1>
         </div>
       </div>
 
       {/* Quick Highway Presets */}
       <div>
-        <span className="text-xs font-semibold text-slate-400 block mb-2.5">
+        <span className="text-xs font-bold text-[#5f6368] block mb-2.5">
           Select a Popular Highway Route Preset:
         </span>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -146,16 +199,16 @@ export function CreateTrip() {
               key={idx}
               type="button"
               onClick={() => handleApplyPreset(preset)}
-              className={`p-3.5 rounded-xl border text-left transition-all ${
+              className={`p-3.5 rounded-2xl border text-left transition-all ${
                 tripName === preset.name
-                  ? 'bg-brand-500/15 border-brand-500/50 shadow-md shadow-brand-500/10'
-                  : 'bg-slate-850/80 hover:bg-slate-800 border-slate-800'
+                  ? 'bg-[#e8f0fe] border-[#1a73e8] shadow-xs'
+                  : 'bg-white hover:bg-[#f8f9fa] border-[#dadce0]'
               }`}
             >
-              <p className="text-xs font-bold text-white leading-snug">{preset.name}</p>
-              <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2">
+              <p className="text-xs font-bold text-[#202124] leading-snug">{preset.name}</p>
+              <div className="flex items-center justify-between text-[11px] text-[#5f6368] mt-2">
                 <span className="font-mono">{preset.distance}</span>
-                <span className="font-mono">{preset.duration}</span>
+                <span className="font-mono font-semibold text-[#1a73e8]">{preset.duration}</span>
               </div>
             </button>
           ))}
@@ -163,33 +216,74 @@ export function CreateTrip() {
       </div>
 
       {/* Trip Form */}
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800">
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-[#dadce0] shadow-sm">
         {error && (
-          <div className="mb-6 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs">
+          <div className="mb-6 p-3 rounded-2xl bg-[#fce8e6] border border-[#fad2cf] text-[#c5221f] text-xs font-bold">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleCreate} className="space-y-6">
+        <form onSubmit={handleCreate} className="space-y-5">
           {/* Group Selector */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Select Travel Group</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-[#3c4043]">Select Travel Group</label>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsJoinGroupOpen(true)}
+                  className="text-xs font-bold text-[#1a73e8] hover:text-[#1557d0] flex items-center gap-1"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Join Code</span>
+                </button>
+                <span className="text-[#dadce0]">·</span>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateGroupOpen(true)}
+                  className="text-xs font-bold text-[#1a73e8] hover:text-[#1557d0] flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New Group</span>
+                </button>
+              </div>
+            </div>
+
             {groups.length === 0 ? (
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-400 flex items-center justify-between">
-                <span>No groups available. Please create a group first.</span>
-                <Link to="/dashboard" className="text-brand-400 font-bold underline">
-                  Create Group
-                </Link>
+              <div className="p-4 rounded-2xl bg-[#f8f9fa] border border-[#dadce0] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-[#5f6368] font-medium">
+                    No travel groups found. Create or join a group to start planning your road trip.
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateGroupOpen(true)}
+                    className="px-3.5 py-1.5 rounded-full bg-[#1a73e8] hover:bg-[#1557d0] text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Create Travel Group</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleQuickCreateGroup}
+                    className="px-3.5 py-1.5 rounded-full bg-white hover:bg-[#f1f3f4] text-[#3c4043] border border-[#dadce0] text-xs font-bold transition-colors flex items-center gap-1 shadow-xs"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-[#f9ab00]" />
+                    <span>Quick Create Demo Group</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <select
                 value={groupId}
                 onChange={(e) => setGroupId(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-750 text-white text-sm focus:outline-none focus:border-brand-500 transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#dadce0] text-[#202124] text-sm focus:outline-none focus:border-[#1a73e8] transition-colors"
               >
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.name} ({g.invite_code})
+                    {g.name} (Code: {g.invite_code}) {g.isOwner ? '• Owner' : '• Member'}
                   </option>
                 ))}
               </select>
@@ -198,70 +292,70 @@ export function CreateTrip() {
 
           {/* Trip Name */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">Trip Name</label>
+            <label className="block text-xs font-bold text-[#3c4043] mb-1.5">Trip Name</label>
             <input
               type="text"
               required
               value={tripName}
               onChange={(e) => setTripName(e.target.value)}
               placeholder="e.g. Manali Expedition 2026"
-              className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-750 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-brand-500 transition-colors"
+              className="w-full px-4 py-2.5 rounded-xl bg-white border border-[#dadce0] text-[#202124] placeholder-[#80868b] text-sm focus:outline-none focus:border-[#1a73e8] transition-colors"
             />
           </div>
 
           {/* Origin & Destination */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Origin</label>
+              <label className="block text-xs font-bold text-[#3c4043] mb-1.5">Origin</label>
               <div className="relative">
-                <MapPin className="w-4 h-4 text-emerald-400 absolute left-3.5 top-1/2 transform -translate-y-1/2" />
+                <MapPin className="w-4 h-4 text-[#1e8e3e] absolute left-3.5 top-1/2 transform -translate-y-1/2" />
                 <input
                   type="text"
                   required
                   value={origin}
                   onChange={(e) => setOrigin(e.target.value)}
                   placeholder="Starting point"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-750 text-white text-sm focus:outline-none focus:border-brand-500 transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-[#dadce0] text-[#202124] text-sm focus:outline-none focus:border-[#1a73e8] transition-colors"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Destination</label>
+              <label className="block text-xs font-bold text-[#3c4043] mb-1.5">Destination</label>
               <div className="relative">
-                <MapPin className="w-4 h-4 text-indigo-400 absolute left-3.5 top-1/2 transform -translate-y-1/2" />
+                <MapPin className="w-4 h-4 text-[#d93025] absolute left-3.5 top-1/2 transform -translate-y-1/2" />
                 <input
                   type="text"
                   required
                   value={destination}
                   onChange={(e) => setDestination(e.target.value)}
                   placeholder="Final Destination"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-750 text-white text-sm focus:outline-none focus:border-brand-500 transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-[#dadce0] text-[#202124] text-sm focus:outline-none focus:border-[#1a73e8] transition-colors"
                 />
               </div>
             </div>
           </div>
 
           {/* Route Preview Summary Card */}
-          <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 flex items-center justify-between">
+          <div className="bg-[#f8f9fa] p-4 rounded-2xl border border-[#dadce0] flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-brand-500/10 text-brand-400">
+              <div className="p-2 rounded-full bg-[#e8f0fe] text-[#1a73e8]">
                 <Route className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-xs font-bold text-white">Estimated Distance & Duration</p>
-                <p className="text-[11px] text-slate-400">Calculated via Road Geodesic Matrix</p>
+                <p className="text-xs font-bold text-[#202124]">Estimated Distance & Duration</p>
+                <p className="text-[11px] text-[#5f6368]">Calculated via Road Geodesic Matrix</p>
               </div>
             </div>
 
             <div className="flex items-center gap-4 text-right">
               <div>
-                <span className="text-[10px] text-slate-500 uppercase block">Distance</span>
-                <span className="font-mono text-sm font-bold text-slate-200">{distance}</span>
+                <span className="text-[10px] text-[#5f6368] uppercase block font-medium">Distance</span>
+                <span className="font-mono text-sm font-bold text-[#202124]">{distance}</span>
               </div>
               <div>
-                <span className="text-[10px] text-slate-500 uppercase block">Est. Time</span>
-                <span className="font-mono text-sm font-bold text-brand-400">{duration}</span>
+                <span className="text-[10px] text-[#5f6368] uppercase block font-medium">Est. Time</span>
+                <span className="font-mono text-sm font-bold text-[#1a73e8]">{duration}</span>
               </div>
             </div>
           </div>
@@ -269,13 +363,25 @@ export function CreateTrip() {
           <button
             type="submit"
             disabled={isLoading || !groupId}
-            className="w-full py-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-sm shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-3 rounded-full bg-[#1a73e8] hover:bg-[#1557d0] text-white font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <span>{isLoading ? 'Creating Trip...' : 'Create & Proceed to Live Map'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
       </div>
+
+      {/* Modals */}
+      <CreateGroupModal
+        isOpen={isCreateGroupOpen}
+        onClose={() => setIsCreateGroupOpen(false)}
+        onGroupCreated={handleGroupCreatedOrJoined}
+      />
+      <JoinGroupModal
+        isOpen={isJoinGroupOpen}
+        onClose={() => setIsJoinGroupOpen(false)}
+        onGroupJoined={handleGroupCreatedOrJoined}
+      />
     </div>
   );
 }

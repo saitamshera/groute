@@ -16,8 +16,8 @@ function ProtectedRoute({ children }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-400">
-        <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa] text-[#5f6368]">
+        <div className="w-8 h-8 border-4 border-[#1a73e8] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -38,7 +38,7 @@ export function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-slate-950 flex flex-col font-sans">
+      <div className="min-h-screen bg-[#f8f9fa] text-[#202124] flex flex-col font-sans">
         <Navbar />
         <main className="flex-1">
           <Routes>

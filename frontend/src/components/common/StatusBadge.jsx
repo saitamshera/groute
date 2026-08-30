@@ -5,43 +5,43 @@ export function StatusBadge({ status, speed, distance }) {
 
   const configs = {
     MOVING: {
-      bg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400',
-      dot: 'bg-emerald-400 animate-pulse',
+      bg: 'bg-[#e6f4ea] border-[#ceead6] text-[#137333]',
+      dot: 'bg-[#1e8e3e] animate-pulse',
       label: 'Moving'
     },
     STOPPED: {
-      bg: 'bg-rose-500/15 border-rose-500/30 text-rose-400',
-      dot: 'bg-rose-500',
+      bg: 'bg-[#fce8e6] border-[#fad2cf] text-[#c5221f]',
+      dot: 'bg-[#d93025]',
       label: 'Stopped'
     },
     POSSIBLE_STOP: {
-      bg: 'bg-amber-500/15 border-amber-500/30 text-amber-400',
-      dot: 'bg-amber-400 animate-ping',
+      bg: 'bg-[#fef7e0] border-[#feefc3] text-[#b06000]',
+      dot: 'bg-[#f9ab00] animate-ping',
       label: 'Stationary'
     },
     SPLIT: {
-      bg: 'bg-red-500/20 border-red-500/40 text-red-400',
-      dot: 'bg-red-500 animate-ping',
+      bg: 'bg-[#fef7e0] border-[#feefc3] text-[#b06000]',
+      dot: 'bg-[#f9ab00] animate-ping',
       label: 'Falling Behind'
     },
     REJOINED: {
-      bg: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400',
-      dot: 'bg-cyan-400',
+      bg: 'bg-[#e8f0fe] border-[#d2e3fc] text-[#1a73e8]',
+      dot: 'bg-[#1a73e8]',
       label: 'Rejoined'
     },
     LOCATION_OFF: {
-      bg: 'bg-slate-700/30 border-slate-600/30 text-slate-400',
-      dot: 'bg-slate-500',
+      bg: 'bg-[#f1f3f4] border-[#dadce0] text-[#5f6368]',
+      dot: 'bg-[#80868b]',
       label: 'Location Off'
     },
     OFFLINE: {
-      bg: 'bg-zinc-800/40 border-zinc-700/30 text-zinc-400',
-      dot: 'bg-zinc-600',
+      bg: 'bg-[#f1f3f4] border-[#dadce0] text-[#80868b]',
+      dot: 'bg-[#80868b]',
       label: 'Offline'
     },
     STALE: {
-      bg: 'bg-yellow-500/15 border-yellow-500/30 text-yellow-400',
-      dot: 'bg-yellow-500',
+      bg: 'bg-[#fef7e0] border-[#feefc3] text-[#b06000]',
+      dot: 'bg-[#f9ab00]',
       label: 'Stale GPS'
     }
   };
@@ -49,7 +49,7 @@ export function StatusBadge({ status, speed, distance }) {
   const config = configs[normalized] || configs.MOVING;
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${config.bg}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold border ${config.bg}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
       <span>{config.label}</span>
       {normalized === 'MOVING' && speed !== undefined && speed > 0 && (

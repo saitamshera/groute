@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, FastForward, Sliders, Sparkles, CheckCircle2, ShieldAlert, Coffee } from 'lucide-react';
+import { Play, Pause, RotateCcw, Sliders, Sparkles, ChevronUp, ChevronDown } from 'lucide-react';
 import { getSocket } from '../../services/socket.js';
 import useTripStore from '../../store/tripStore.js';
 
@@ -32,6 +32,7 @@ export function DemoController() {
   const [stepIndex, setStepIndex] = useState(0);
   const [simAmanStopped, setSimAmanStopped] = useState(false);
   const [simKaranSplit, setSimKaranSplit] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const timerRef = useRef(null);
 
   // Simulated traveler profiles
@@ -72,7 +73,6 @@ export function DemoController() {
       if (member.id === 'sim-aman') {
         if (forceAmanStop) {
           speed = 0; // Stationary
-          // Lock coordinate to Murthal
           const murthal = routeWaypoints[2];
           socket.emit('location:update', {
             tripId: trip.id,
@@ -172,91 +172,116 @@ export function DemoController() {
     emitSimulatedStep(stepIndex, simAmanStopped, next);
   };
 
+  if (isMinimized) {
+    return (
+      <button
+        onClick={() => setIsMinimized(false)}
+        className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-white text-[#202124] text-xs font-bold shadow-md border border-[#dadce0] hover:bg-[#f8f9fa] transition-all"
+      >
+        <span className="flex h-2 w-2 relative">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#f9ab00] opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-[#f9ab00]"></span>
+        </span>
+        <span>⚡ Demo Controller</span>
+        <ChevronUp className="w-3.5 h-3.5 text-[#5f6368]" />
+      </button>
+    );
+  }
+
   return (
-    <div className="bg-slate-900/95 border border-brand-500/30 rounded-2xl p-3 sm:p-4 shadow-2xl backdrop-blur-md">
-      {/* Top Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-800">
+    <div className="bg-white border border-[#dadce0] rounded-3xl p-3 sm:p-3.5 shadow-xl max-w-2xl w-full">
+      {/* Header Bar */}
+      <div className="flex items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-[#f1f3f4]">
         <div className="flex items-center gap-2">
-          <span className="flex h-2.5 w-2.5 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+          <span className="flex h-2 w-2 relative">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#f9ab00] opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#f9ab00]"></span>
           </span>
-          <span className="text-xs font-bold uppercase tracking-wider text-amber-400 font-display">
-            Simulation & Interview Demo Mode
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[#b06000]">
+            Convoy Simulation Engine
           </span>
-          <span className="text-[11px] text-slate-400 hidden sm:inline">
-            (5 simulated travelers on Delhi → Manali route)
+          <span className="text-[10px] text-[#5f6368] hidden sm:inline">
+            (5 simulated travelers)
           </span>
         </div>
 
-        {/* Speed Multiplier */}
-        <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 text-xs">
-          <span className="text-slate-500 mr-1 text-[11px]">Speed:</span>
-          {[1, 2, 5, 10].map((s) => (
-            <button
-              key={s}
-              onClick={() => setSpeedMultiplier(s)}
-              className={`px-1.5 py-0.5 rounded font-mono font-semibold transition-colors ${
-                speedMultiplier === s
-                  ? 'bg-brand-500 text-white'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              {s}x
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          {/* Speed Multipliers */}
+          <div className="flex items-center gap-0.5 bg-[#f8f9fa] px-1.5 py-0.5 rounded-full border border-[#dadce0] text-[11px]">
+            {[1, 2, 5, 10].map((s) => (
+              <button
+                key={s}
+                onClick={() => setSpeedMultiplier(s)}
+                className={`px-2 py-0.2 rounded-full font-mono font-bold transition-colors ${
+                  speedMultiplier === s
+                    ? 'bg-[#1a73e8] text-white'
+                    : 'text-[#5f6368] hover:text-[#202124]'
+                }`}
+              >
+                {s}x
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setIsMinimized(true)}
+            className="p-1 rounded-full text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4]"
+            title="Minimize"
+          >
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
       {/* Main Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         {/* Playback Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={handleTogglePlay}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold shadow-lg transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm transition-all ${
               isSimulationActive
-                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20'
-                : 'bg-brand-600 hover:bg-brand-500 text-white shadow-brand-500/20'
+                ? 'bg-[#fef7e0] border border-[#feefc3] text-[#b06000]'
+                : 'bg-[#1a73e8] hover:bg-[#1557d0] text-white'
             }`}
           >
-            {isSimulationActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-            <span>{isSimulationActive ? 'Pause Simulation' : 'Start Simulation'}</span>
+            {isSimulationActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            <span>{isSimulationActive ? 'Pause' : 'Start'}</span>
           </button>
 
           <button
             onClick={handleReset}
             title="Reset Simulation"
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+            className="p-1.5 rounded-full bg-white hover:bg-[#f1f3f4] border border-[#dadce0] text-[#5f6368] transition-colors"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Quick Scenario Triggers */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={triggerAmanStop}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
               simAmanStopped
-                ? 'bg-rose-500/20 border-rose-500/50 text-rose-300 shadow-rose-500/20'
-                : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800'
+                ? 'bg-[#fce8e6] border-[#fad2cf] text-[#c5221f]'
+                : 'bg-white border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
             }`}
           >
             <span>🛑</span>
-            <span>{simAmanStopped ? 'Resume Aman' : 'Stop Aman at Murthal'}</span>
+            <span>{simAmanStopped ? 'Resume Aman' : 'Stop Aman'}</span>
           </button>
 
           <button
             onClick={triggerKaranSplit}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
               simKaranSplit
-                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-amber-500/20'
-                : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-800'
+                ? 'bg-[#fef7e0] border-[#feefc3] text-[#b06000]'
+                : 'bg-white border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
             }`}
           >
             <span>⚠</span>
-            <span>{simKaranSplit ? 'Rejoin Karan' : 'Split Karan (7.8km Behind)'}</span>
+            <span>{simKaranSplit ? 'Rejoin Karan' : 'Split Karan (7.8km)'}</span>
           </button>
         </div>
       </div>

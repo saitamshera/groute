@@ -1,26 +1,32 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { ZoomIn, ZoomOut, Compass, Navigation, Maximize2, MapPin, Eye } from 'lucide-react';
-import useTripStore from '../../store/tripStore.js';
-import { formatSpeed, formatDistance } from '../../utils/formatters.js';
+import useTripStore, { selectTravelers } from '../../store/tripStore.js';
+import useAuthStore from '../../store/authStore.js';
+import { Navigation } from 'lucide-react';
 
 export function CanvasMapVisualizer() {
   const {
     trip,
+    members,
     liveLocations,
     stops,
     groupCenter,
     selectedMemberId,
     setSelectedMemberId,
-    setSelectedStop
+    setSelectedStop,
+    mapFocus,
+    layerVisibility
   } = useTripStore();
 
+  const { user: currentUser } = useAuthStore();
   const containerRef = useRef(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  // Map coordinate projection bounds (Standard Delhi -> Manali bounds or dynamic from points)
+  const travelers = selectTravelers(members, liveLocations, currentUser?.id);
+
+  // Map coordinate projection bounds (Standard Delhi -> Manali bounds or dynamic)
   const defaultBounds = {
     minLat: 28.4,
     maxLat: 32.5,
@@ -43,8 +49,33 @@ export function CanvasMapVisualizer() {
     };
   };
 
+  // React to mapFocus triggers
+  useEffect(() => {
+    if (!mapFocus) return;
+
+    if (mapFocus.fitGroup) {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    } else if (mapFocus.lat && mapFocus.lng) {
+      const proj = projectCoords(mapFocus.lat, mapFocus.lng);
+      const targetZoom = mapFocus.zoom ? Math.min(2.5, mapFocus.zoom / 7) : 1.6;
+      setZoom(targetZoom);
+      const container = containerRef.current;
+      if (container) {
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        const targetX = (proj.x / 100) * width;
+        const targetY = (proj.y / 100) * height;
+        const panX = (width / 2 - targetX) * (targetZoom - 0.2);
+        const panY = (height / 2 - targetY) * (targetZoom - 0.2);
+        setPan({ x: panX, y: panY });
+      }
+    }
+  }, [mapFocus]);
+
   // Mouse pan handlers
   const handleMouseDown = (e) => {
+    if (e.button !== 0) return;
     setIsDragging(true);
     setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
@@ -59,12 +90,13 @@ export function CanvasMapVisualizer() {
 
   const handleMouseUp = () => setIsDragging(false);
 
-  const resetView = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.15 : 0.15;
+    setZoom((prev) => Math.max(0.75, Math.min(3.5, prev + delta)));
   };
 
-  // Waypoints along Delhi-Manali NH44 / NH21 highway
+  // Highway Waypoints along Delhi-Manali NH44 / NH21 highway
   const routeWaypoints = [
     { name: 'Delhi', lat: 28.6315, lng: 77.2167 },
     { name: 'Murthal', lat: 29.0264, lng: 77.0700 },
@@ -72,7 +104,7 @@ export function CanvasMapVisualizer() {
     { name: 'Karnal', lat: 29.6857, lng: 76.9905 },
     { name: 'Kurukshetra', lat: 29.9695, lng: 76.8783 },
     { name: 'Ambala', lat: 30.3782, lng: 76.7767 },
-    { name: 'Chandigarh Bypass', lat: 30.7333, lng: 76.7794 },
+    { name: 'Chandigarh', lat: 30.7333, lng: 76.7794 },
     { name: 'Kiratpur', lat: 31.1812, lng: 76.5684 },
     { name: 'Bilaspur', lat: 31.3400, lng: 76.7600 },
     { name: 'Mandi', lat: 31.7087, lng: 76.9320 },
@@ -82,7 +114,7 @@ export function CanvasMapVisualizer() {
 
   const originProj = projectCoords(trip?.origin_lat || 28.6315, trip?.origin_lng || 77.2167);
   const destProj = projectCoords(trip?.destination_lat || 32.2396, trip?.destination_lng || 77.1887);
-  const centerProj = groupCenter ? projectCoords(groupCenter.latitude, groupCenter.longitude) : null;
+  const centerProj = groupCenter && groupCenter.latitude ? projectCoords(groupCenter.latitude, groupCenter.longitude) : null;
 
   // Build SVG path string for route
   const pathD = routeWaypoints.reduce((acc, wp, idx) => {
@@ -97,83 +129,85 @@ export function CanvasMapVisualizer() {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      className="relative w-full h-full bg-[#090d16] overflow-hidden select-none cursor-grab active:cursor-grabbing rounded-2xl border border-slate-800"
+      onWheel={handleWheel}
+      className="relative w-full h-full bg-[#f1f3f4] overflow-hidden select-none cursor-grab active:cursor-grabbing"
     >
-      {/* Map Background Grid & Cartographic Texture */}
+      {/* Map Background Grid & Cartographic Canvas Layer */}
       <div
-        className="absolute inset-0 transition-transform duration-75"
+        className="absolute inset-0 transition-transform duration-100 ease-out"
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: 'center center'
         }}
       >
-        {/* Subtle coordinate grid lines */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-20" xmlns="http://www.w3.org/2000/svg">
+        {/* Cartographic Coordinate Grid */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-40" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
-              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#334155" strokeWidth="0.8" />
+            <pattern id="light-carto-grid" width="80" height="80" patternUnits="userSpaceOnUse">
+              <path d="M 80 0 L 0 0 0 80" fill="none" stroke="#dadce0" strokeWidth="0.8" />
             </pattern>
           </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
+          <rect width="100%" height="100%" fill="url(#light-carto-grid)" />
         </svg>
 
-        {/* Dynamic SVG Vector Route Layer */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
-          {/* Route Glow Shadow */}
-          <path
-            d={pathD}
-            fill="none"
-            stroke="#2563eb"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="opacity-40 filter blur-[2px]"
-          />
-          {/* Main Highway Route Polyline */}
-          <path
-            d={pathD}
-            fill="none"
-            stroke="#3b82f6"
-            strokeWidth="1.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeDasharray="2 0.5"
-          />
+        {/* Dynamic Vector Route Layer */}
+        {layerVisibility?.route && (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+            {/* Route Casing */}
+            <path
+              d={pathD}
+              fill="none"
+              stroke="#8ab4f8"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="opacity-70"
+            />
+            {/* Highway Route Polyline */}
+            <path
+              d={pathD}
+              fill="none"
+              stroke="#1a73e8"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
 
-          {/* Separation Alert Vectors (dotted line from split members to Group Centroid) */}
-          {centerProj && Object.values(liveLocations).map((loc) => {
-            if (loc.status === 'SPLIT' && loc.latitude) {
-              const memProj = projectCoords(loc.latitude, loc.longitude);
-              return (
-                <g key={`split-line-${loc.userId}`}>
-                  <line
-                    x1={centerProj.x}
-                    y1={centerProj.y}
-                    x2={memProj.x}
-                    y2={memProj.y}
-                    stroke="#f59e0b"
-                    strokeWidth="0.8"
-                    strokeDasharray="1 1"
-                    className="animate-pulse"
-                  />
-                </g>
-              );
-            }
-            return null;
-          })}
-        </svg>
+            {/* Separation Alert Vectors (dotted line from split members to Group Centroid) */}
+            {centerProj && travelers.map((t) => {
+              if ((t.status === 'SPLIT' || t.status === 'FALLING_BEHIND') && t.latitude && t.longitude) {
+                const memProj = projectCoords(t.latitude, t.longitude);
+                return (
+                  <g key={`split-line-${t.id}`}>
+                    <line
+                      x1={centerProj.x}
+                      y1={centerProj.y}
+                      x2={memProj.x}
+                      y2={memProj.y}
+                      stroke="#f9ab00"
+                      strokeWidth="1.2"
+                      strokeDasharray="1.5 1"
+                      className="animate-pulse"
+                    />
+                  </g>
+                );
+              }
+              return null;
+            })}
+          </svg>
+        )}
 
         {/* Highway Milestone Labels */}
-        {routeWaypoints.map((wp, idx) => {
+        {layerVisibility?.route && routeWaypoints.map((wp, idx) => {
           const pt = projectCoords(wp.lat, wp.lng);
           return (
             <div
               key={idx}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1 opacity-50"
+              className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none flex items-center gap-1 opacity-75"
               style={{ left: `${pt.x}%`, top: `${pt.y}%` }}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-              <span className="text-[9px] font-mono text-slate-400 whitespace-nowrap bg-slate-900/60 px-1 rounded">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#5f6368]" />
+              <span className="text-[10px] font-medium text-[#5f6368] whitespace-nowrap bg-white/90 px-1.5 py-0.2 rounded border border-[#dadce0] shadow-xs">
                 {wp.name}
               </span>
             </div>
@@ -186,10 +220,11 @@ export function CanvasMapVisualizer() {
           style={{ left: `${originProj.x}%`, top: `${originProj.y}%` }}
         >
           <div className="flex flex-col items-center">
-            <span className="px-2 py-0.5 rounded bg-emerald-500/90 text-white font-bold text-[10px] shadow-lg">
+            <span className="px-2.5 py-1 rounded-full bg-[#1e8e3e] text-white font-bold text-[10px] shadow-md flex items-center gap-1 border border-white">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
               Origin: {trip?.origin || 'Start'}
             </span>
-            <div className="w-2.5 h-2.5 bg-emerald-500 rotate-45 transform -translate-y-1" />
+            <div className="w-2 h-2 bg-[#1e8e3e] rotate-45 transform -translate-y-1 border-r border-b border-white" />
           </div>
         </div>
 
@@ -199,10 +234,10 @@ export function CanvasMapVisualizer() {
           style={{ left: `${destProj.x}%`, top: `${destProj.y}%` }}
         >
           <div className="flex flex-col items-center">
-            <span className="px-2 py-0.5 rounded bg-indigo-500/90 text-white font-bold text-[10px] shadow-lg">
+            <span className="px-2.5 py-1 rounded-full bg-[#d93025] text-white font-bold text-[10px] shadow-md flex items-center gap-1 border border-white">
               🏁 {trip?.destination || 'Destination'}
             </span>
-            <div className="w-2.5 h-2.5 bg-indigo-500 rotate-45 transform -translate-y-1" />
+            <div className="w-2 h-2 bg-[#d93025] rotate-45 transform -translate-y-1 border-r border-b border-white" />
           </div>
         </div>
 
@@ -213,19 +248,19 @@ export function CanvasMapVisualizer() {
             style={{ left: `${centerProj.x}%`, top: `${centerProj.y}%` }}
           >
             <div className="relative flex items-center justify-center">
-              <span className="w-12 h-12 rounded-full border border-brand-400/40 bg-brand-500/10 animate-ping-slow absolute" />
-              <div className="w-4 h-4 rounded-full bg-brand-500 border-2 border-white flex items-center justify-center shadow-lg shadow-brand-500/50">
+              <span className="w-12 h-12 rounded-full border border-[#1a73e8]/40 bg-[#1a73e8]/10 animate-ping-slow absolute" />
+              <div className="w-4 h-4 rounded-full bg-[#1a73e8] border-2 border-white flex items-center justify-center shadow-md">
                 <span className="w-1.5 h-1.5 rounded-full bg-white" />
               </div>
-              <span className="absolute -bottom-4 text-[9px] font-bold text-brand-300 bg-slate-900/90 px-1.5 py-0.5 rounded border border-brand-500/30 whitespace-nowrap">
-                Group Center
+              <span className="absolute -bottom-4 text-[9px] font-bold text-[#1a73e8] bg-white px-2 py-0.2 rounded-full border border-[#1a73e8]/30 whitespace-nowrap shadow-xs">
+                Convoy Hub
               </span>
             </div>
           </div>
         )}
 
         {/* Stop Markers */}
-        {stops.map((stop) => {
+        {layerVisibility?.stops && stops.map((stop) => {
           if (!stop.latitude || !stop.longitude) return null;
           const proj = projectCoords(stop.latitude, stop.longitude);
           return (
@@ -239,10 +274,10 @@ export function CanvasMapVisualizer() {
               style={{ left: `${proj.x}%`, top: `${proj.y}%` }}
             >
               <div className="relative group flex flex-col items-center">
-                <div className="w-8 h-8 rounded-full bg-rose-600 border-2 border-white shadow-xl shadow-rose-600/50 flex items-center justify-center text-sm font-bold animate-bounce">
+                <div className="w-7 h-7 rounded-full bg-[#d93025] border-2 border-white shadow-md flex items-center justify-center text-xs font-bold text-white">
                   🛑
                 </div>
-                <div className="absolute top-9 px-2 py-0.5 rounded bg-slate-900/95 border border-rose-500/40 text-[10px] font-semibold text-rose-300 shadow-md whitespace-nowrap">
+                <div className="absolute top-8 px-2 py-0.5 rounded-md bg-white border border-[#dadce0] text-[10px] font-bold text-[#d93025] shadow-xs whitespace-nowrap">
                   {stop.location_name || 'Stop'}
                 </div>
               </div>
@@ -250,69 +285,91 @@ export function CanvasMapVisualizer() {
           );
         })}
 
-        {/* Live Active Member Markers */}
-        {Object.values(liveLocations).map((loc) => {
-          if (!loc.latitude || !loc.longitude || loc.locationSharing === false || loc.status === 'LOCATION_OFF') {
+        {/* Live Active Member Markers (Every reporting traveler) */}
+        {layerVisibility?.members && travelers.map((t) => {
+          if (!t.latitude || !t.longitude || t.isSharingOff || t.status === 'OFFLINE') {
             return null;
           }
 
-          const proj = projectCoords(loc.latitude, loc.longitude);
-          const isSelected = selectedMemberId === loc.userId;
-          const isStopped = loc.status === 'STOPPED';
-          const isSplit = loc.status === 'SPLIT';
+          const proj = projectCoords(t.latitude, t.longitude);
+          const isSelected = selectedMemberId === t.id;
+          const isStopped = t.status === 'STOPPED' || t.status === 'POSSIBLE_STOP';
+          const isSplit = t.status === 'SPLIT' || t.status === 'FALLING_BEHIND';
 
           return (
             <div
-              key={loc.userId}
+              key={t.id}
               onClick={(e) => {
                 e.stopPropagation();
-                setSelectedMemberId(loc.userId);
+                setSelectedMemberId(t.id);
               }}
               className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-30 cursor-pointer transition-all duration-300 pointer-events-auto ${
-                isSelected ? 'scale-125 z-40' : 'hover:scale-110'
+                isSelected ? 'scale-120 z-40' : 'hover:scale-110'
               }`}
               style={{ left: `${proj.x}%`, top: `${proj.y}%` }}
             >
               <div className="relative flex flex-col items-center group">
-                {/* Pulse Radar for moving users */}
-                {!isStopped && (
-                  <span className="absolute -inset-2 rounded-full bg-brand-500/30 animate-radar pointer-events-none" />
+                {/* Direction Heading Pointer (when moving with heading) */}
+                {!isStopped && t.heading !== undefined && (
+                  <div
+                    className="absolute -top-3 w-4 h-4 text-[#1a73e8] transition-transform pointer-events-none"
+                    style={{ transform: `rotate(${t.heading}deg)` }}
+                  >
+                    <Navigation className="w-3.5 h-3.5 fill-[#1a73e8]" />
+                  </div>
                 )}
 
-                {/* Avatar with status ring */}
+                {/* Radar pulse ring for moving users */}
+                {!isStopped && (
+                  <span className="absolute -inset-1.5 rounded-full bg-[#1a73e8]/20 animate-radar pointer-events-none" />
+                )}
+
+                {/* Custom Google Maps Marker Pin */}
                 <div
-                  className={`relative w-10 h-10 rounded-full border-2 p-0.5 bg-slate-900 shadow-2xl transition-colors ${
+                  className={`relative w-9 h-9 rounded-full border-2 p-0.5 bg-white shadow-md transition-colors ${
                     isStopped
-                      ? 'border-rose-500 ring-4 ring-rose-500/20'
+                      ? 'border-[#d93025] ring-3 ring-[#d93025]/20'
                       : isSplit
-                      ? 'border-amber-400 ring-4 ring-amber-400/30'
-                      : isSelected
-                      ? 'border-white ring-4 ring-brand-500/40'
-                      : 'border-brand-500'
+                      ? 'border-[#f9ab00] ring-3 ring-[#f9ab00]/25'
+                      : t.isMe
+                      ? 'border-[#1a73e8] ring-3 ring-[#1a73e8]/30'
+                      : 'border-[#1e8e3e]'
                   }`}
                 >
                   <img
-                    src={loc.userImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${loc.userName}`}
-                    alt={loc.userName}
+                    src={t.profile_image}
+                    alt={t.name}
                     className="w-full h-full rounded-full object-cover"
                   />
 
                   {/* Micro state icon badge */}
                   <span
-                    className={`absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white border border-slate-900 ${
-                      isStopped ? 'bg-rose-500' : isSplit ? 'bg-amber-500' : 'bg-emerald-500'
+                    className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white border border-white ${
+                      isStopped ? 'bg-[#d93025]' : isSplit ? 'bg-[#f9ab00]' : t.isMe ? 'bg-[#1a73e8]' : 'bg-[#1e8e3e]'
                     }`}
                   >
-                    {isStopped ? '🛑' : isSplit ? '⚠' : '▶'}
+                    {isStopped ? '🛑' : isSplit ? '⚠' : t.isMe ? '★' : '▶'}
                   </span>
                 </div>
 
                 {/* Floating Member Info Tag */}
-                <div className="mt-1 px-2 py-0.5 rounded-md bg-slate-900/95 border border-slate-700/80 shadow-xl flex items-center gap-1.5 whitespace-nowrap">
-                  <span className="text-[11px] font-bold text-white">{loc.userName}</span>
-                  {loc.speed > 0 && (
-                    <span className="text-[10px] font-mono font-semibold text-brand-300">
-                      · {Math.round(loc.speed)} km/h
+                <div className="mt-1 px-2 py-0.5 rounded-full bg-white border border-[#dadce0] shadow-sm flex items-center gap-1 whitespace-nowrap">
+                  <span className="text-[10px] font-bold text-[#202124]">
+                    {t.name}
+                  </span>
+                  {t.isMe && (
+                    <span className="text-[8px] uppercase font-extrabold px-1 rounded-full bg-[#1a73e8] text-white">
+                      YOU
+                    </span>
+                  )}
+                  {t.speed !== null && t.speed > 0 && !isStopped && (
+                    <span className="text-[9px] font-mono font-semibold text-[#1a73e8]">
+                      · {Math.round(t.speed)} km/h
+                    </span>
+                  )}
+                  {isStopped && (
+                    <span className="text-[9px] font-semibold text-[#d93025]">
+                      · Stopped
                     </span>
                   )}
                 </div>
@@ -320,47 +377,6 @@ export function CanvasMapVisualizer() {
             </div>
           );
         })}
-      </div>
-
-      {/* Floating Map Controls */}
-      <div className="absolute top-4 right-4 z-40 flex flex-col gap-2 bg-slate-900/90 border border-slate-800 p-1.5 rounded-xl backdrop-blur-md shadow-xl">
-        <button
-          onClick={() => setZoom(z => Math.min(3, z + 0.25))}
-          title="Zoom In"
-          className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
-        >
-          <ZoomIn className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => setZoom(z => Math.max(0.75, z - 0.25))}
-          title="Zoom Out"
-          className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
-        >
-          <ZoomOut className="w-4 h-4" />
-        </button>
-        <button
-          onClick={resetView}
-          title="Center Convoy Map"
-          className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
-        >
-          <Compass className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Map Legend */}
-      <div className="absolute bottom-4 left-4 z-40 bg-slate-900/85 border border-slate-800/80 px-3 py-2 rounded-xl backdrop-blur-md text-[11px] text-slate-400 flex items-center gap-4 hidden sm:flex">
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Moving
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-rose-500" /> Stop Detected
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-amber-400" /> Falling Behind (&gt;5km)
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-brand-500" /> Group Center
-        </span>
       </div>
     </div>
   );

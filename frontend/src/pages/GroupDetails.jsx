@@ -74,118 +74,118 @@ export function GroupDetails() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Navigation Header */}
       <div className="flex items-center gap-3">
         <Link
           to="/dashboard"
-          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+          className="p-2 rounded-full bg-white hover:bg-[#f1f3f4] text-[#5f6368] border border-[#dadce0] transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div>
-          <span className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Travel Group</span>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">{group.name}</h1>
+          <span className="text-xs uppercase tracking-wider text-[#5f6368] font-bold">Travel Group</span>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#202124]">{group.name}</h1>
         </div>
       </div>
 
       {/* Hero Invite Code & Info Banner */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Invite Code Box */}
-        <div className="glass-panel p-6 rounded-2xl border border-brand-500/30 flex flex-col justify-between">
+        <div className="bg-white p-6 rounded-3xl border border-[#dadce0] shadow-sm flex flex-col justify-between">
           <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-brand-400 block mb-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#1a73e8] block mb-1">
               Group Invite Code
             </span>
-            <p className="text-xs text-slate-400 mb-4">
+            <p className="text-xs text-[#5f6368] mb-4">
               Share this code with friends so they can join this group from their dashboard.
             </p>
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
-            <span className="font-mono text-2xl font-black tracking-widest text-white">
+          <div className="flex items-center justify-between p-3 rounded-2xl bg-[#f8f9fa] border border-[#dadce0]">
+            <span className="font-mono text-2xl font-black tracking-widest text-[#202124]">
               {group.invite_code}
             </span>
             <button
               onClick={handleCopyCode}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold shadow-md transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1a73e8] hover:bg-[#1557d0] text-white text-xs font-bold shadow-xs transition-colors"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? 'Copied' : 'Copy'}</span>
             </button>
           </div>
         </div>
 
         {/* Group Stats */}
-        <div className="md:col-span-2 glass-panel p-6 rounded-2xl flex flex-col justify-between">
+        <div className="md:col-span-2 bg-white p-6 rounded-3xl border border-[#dadce0] shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#5f6368] block mb-1">
                 Convoy Management
               </span>
-              <p className="text-sm text-slate-300">
+              <p className="text-sm text-[#202124] font-medium">
                 You are {group.isOwner ? 'the Group Owner' : 'a Group Member'}.
               </p>
             </div>
 
             <Link
               to={`/trips/new?group=${group.id}`}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-semibold text-xs shadow-lg shadow-brand-500/25 transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#1a73e8] hover:bg-[#1557d0] text-white font-bold text-xs shadow-sm transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>Plan New Trip</span>
             </Link>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-800 text-center">
-            <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
-              <span className="text-[11px] text-slate-400 block">Total Members</span>
-              <span className="text-lg font-bold text-white">{members.length}</span>
+          <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-[#f1f3f4] text-center">
+            <div className="bg-[#f8f9fa] p-2.5 rounded-2xl border border-[#dadce0]">
+              <span className="text-[11px] text-[#5f6368] block font-medium">Total Members</span>
+              <span className="text-lg font-bold text-[#202124]">{members.length}</span>
             </div>
-            <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
-              <span className="text-[11px] text-slate-400 block">Planned Trips</span>
-              <span className="text-lg font-bold text-brand-400">{trips.length}</span>
+            <div className="bg-[#f8f9fa] p-2.5 rounded-2xl border border-[#dadce0]">
+              <span className="text-[11px] text-[#5f6368] block font-medium">Planned Trips</span>
+              <span className="text-lg font-bold text-[#1a73e8]">{trips.length}</span>
             </div>
-            <div className="bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
-              <span className="text-[11px] text-slate-400 block">Created</span>
-              <span className="text-xs font-semibold text-slate-300">{timeAgo(group.created_at)}</span>
+            <div className="bg-[#f8f9fa] p-2.5 rounded-2xl border border-[#dadce0]">
+              <span className="text-[11px] text-[#5f6368] block font-medium">Created</span>
+              <span className="text-xs font-semibold text-[#202124]">{timeAgo(group.created_at)}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Two Column Grid: Members & Trips */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Members List (Left 1 col) */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-white font-display">Members ({members.length})</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#5f6368]">Members ({members.length})</h3>
           </div>
 
           <div className="space-y-2.5">
             {members.map((mem) => (
               <div
                 key={mem.id}
-                className="glass-card p-3.5 rounded-xl flex items-center justify-between border border-slate-800"
+                className="bg-white p-3.5 rounded-2xl flex items-center justify-between border border-[#dadce0] shadow-xs"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <img
                     src={mem.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${mem.name}`}
                     alt={mem.name}
-                    className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 object-cover shrink-0"
+                    className="w-9 h-9 rounded-full bg-[#f1f3f4] border border-[#dadce0] object-cover shrink-0"
                   />
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-white truncate">{mem.name}</p>
-                    <p className="text-[10px] text-slate-400 truncate">{mem.email}</p>
+                    <p className="text-xs font-bold text-[#202124] truncate">{mem.name}</p>
+                    <p className="text-[10px] text-[#5f6368] truncate">{mem.email}</p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <span
-                    className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${
+                    className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
                       mem.role === 'OWNER'
-                        ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                        : 'bg-slate-800 text-slate-400 border border-slate-700'
+                        ? 'bg-[#fef7e0] text-[#b06000] border border-[#feefc3]'
+                        : 'bg-[#f1f3f4] text-[#5f6368] border border-[#dadce0]'
                     }`}
                   >
                     {mem.role}
@@ -195,7 +195,7 @@ export function GroupDetails() {
                     <button
                       onClick={() => handleRemoveMember(mem.id)}
                       title="Remove Member"
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                      className="p-1.5 rounded-full text-[#5f6368] hover:text-[#d93025] hover:bg-[#fce8e6] transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -207,15 +207,15 @@ export function GroupDetails() {
         </div>
 
         {/* Trips List (Right 2 cols) */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-white font-display">Group Road Trips</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#5f6368]">Group Road Trips</h3>
           </div>
 
           {trips.length === 0 ? (
-            <div className="glass-card rounded-2xl p-8 text-center text-slate-400 text-xs">
+            <div className="bg-white rounded-3xl p-8 text-center text-[#5f6368] text-xs border border-[#dadce0]">
               No trips planned for this group yet.{' '}
-              <Link to={`/trips/new?group=${group.id}`} className="text-brand-400 font-semibold underline">
+              <Link to={`/trips/new?group=${group.id}`} className="text-[#1a73e8] font-bold underline">
                 Create one now
               </Link>
             </div>
@@ -226,8 +226,8 @@ export function GroupDetails() {
                 return (
                   <div
                     key={trip.id}
-                    className={`glass-card p-5 rounded-2xl border transition-all flex flex-col justify-between ${
-                      isActive ? 'border-brand-500/40 bg-brand-500/5' : 'border-slate-800'
+                    className={`bg-white p-5 rounded-3xl border transition-all flex flex-col justify-between shadow-xs hover:shadow-sm ${
+                      isActive ? 'border-[#1a73e8]' : 'border-[#dadce0]'
                     }`}
                   >
                     <div>
@@ -235,37 +235,37 @@ export function GroupDetails() {
                         <span
                           className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider ${
                             isActive
-                              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-slate-800 text-slate-400 border border-slate-700'
+                              ? 'bg-[#e6f4ea] text-[#137333] border border-[#ceead6]'
+                              : 'bg-[#f1f3f4] text-[#5f6368] border border-[#dadce0]'
                           }`}
                         >
                           {trip.status}
                         </span>
-                        <span className="text-xs text-slate-400 font-mono">{trip.distance}</span>
+                        <span className="text-xs text-[#5f6368] font-mono">{trip.distance}</span>
                       </div>
 
-                      <h4 className="text-base font-bold text-white mb-2">{trip.name}</h4>
+                      <h4 className="text-sm font-bold text-[#202124] mb-2">{trip.name}</h4>
 
-                      <div className="space-y-1 text-xs text-slate-300">
+                      <div className="space-y-1 text-xs text-[#5f6368]">
                         <div className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#1e8e3e]" />
                           <span className="truncate">{trip.origin}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#d93025]" />
                           <span className="truncate">{trip.destination}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-5 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-                      <span className="text-[11px] text-slate-400">
+                    <div className="mt-5 pt-4 border-t border-[#f1f3f4] flex items-center justify-between">
+                      <span className="text-[11px] text-[#5f6368]">
                         {trip.estimated_duration || 'Est. Duration N/A'}
                       </span>
 
                       <Link
                         to={`/trips/${trip.id}`}
-                        className="px-3.5 py-1.5 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-semibold text-xs shadow-md transition-colors"
+                        className="px-3.5 py-1.5 rounded-full bg-[#1a73e8] hover:bg-[#1557d0] text-white font-bold text-xs shadow-xs transition-colors"
                       >
                         {isActive ? 'View Live Map' : 'Trip Details'}
                       </Link>

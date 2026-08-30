@@ -1,15 +1,15 @@
 import React, { useEffect } from 'react';
-import { AlertTriangle, MapPin, CheckCircle2, X } from 'lucide-react';
+import { AlertTriangle, MapPin, CheckCircle2, X, ArrowRight } from 'lucide-react';
 import useTripStore from '../../store/tripStore.js';
 
 export function AlertBanner() {
-  const { activeAlert, clearActiveAlert } = useTripStore();
+  const { activeAlert, clearActiveAlert, focusMember, focusStop, focusLocation, stops } = useTripStore();
 
   useEffect(() => {
     if (activeAlert) {
       const timer = setTimeout(() => {
         clearActiveAlert();
-      }, 8000);
+      }, 10000);
       return () => clearTimeout(timer);
     }
   }, [activeAlert, clearActiveAlert]);
@@ -17,37 +17,81 @@ export function AlertBanner() {
   if (!activeAlert) return null;
 
   const typeStyles = {
-    warning: 'bg-amber-500/20 border-amber-500/50 text-amber-200',
-    danger: 'bg-rose-500/20 border-rose-500/50 text-rose-200',
-    info: 'bg-blue-500/20 border-blue-500/50 text-blue-200',
-    success: 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200'
+    warning: 'bg-white border-[#feefc3] text-[#202124] shadow-xl',
+    danger: 'bg-white border-[#fad2cf] text-[#202124] shadow-xl',
+    info: 'bg-white border-[#d2e3fc] text-[#202124] shadow-xl',
+    success: 'bg-white border-[#ceead6] text-[#202124] shadow-xl'
   };
 
   const icons = {
-    warning: <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 animate-bounce" />,
-    danger: <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 animate-pulse" />,
-    info: <MapPin className="w-5 h-5 text-blue-400 shrink-0" />,
-    success: <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+    warning: <AlertTriangle className="w-5 h-5 text-[#f9ab00] shrink-0" />,
+    danger: <AlertTriangle className="w-5 h-5 text-[#d93025] shrink-0 animate-pulse" />,
+    info: <MapPin className="w-5 h-5 text-[#1a73e8] shrink-0" />,
+    success: <CheckCircle2 className="w-5 h-5 text-[#1e8e3e] shrink-0" />
+  };
+
+  const iconBg = {
+    warning: 'bg-[#fef7e0]',
+    danger: 'bg-[#fce8e6]',
+    info: 'bg-[#e8f0fe]',
+    success: 'bg-[#e6f4ea]'
   };
 
   const style = typeStyles[activeAlert.type] || typeStyles.info;
   const icon = icons[activeAlert.type] || icons.info;
+  const currentIconBg = iconBg[activeAlert.type] || 'bg-[#e8f0fe]';
+
+  const handleAction = () => {
+    if (activeAlert.targetUserId) {
+      focusMember(activeAlert.targetUserId);
+    } else if (activeAlert.targetStopId) {
+      const target = stops.find(s => s.id === activeAlert.targetStopId);
+      if (target) {
+        focusStop(target);
+      }
+    } else if (activeAlert.locationCoords) {
+      focusLocation(activeAlert.locationCoords.lat, activeAlert.locationCoords.lng);
+    }
+  };
 
   return (
-    <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-xl w-full px-4 animate-in fade-in slide-in-from-top-4 duration-300">
-      <div className={`p-4 rounded-xl border backdrop-blur-md shadow-2xl flex items-center justify-between gap-3 ${style}`}>
-        <div className="flex items-center gap-3">
-          {icon}
-          <div>
-            <p className="text-sm font-medium leading-snug">{activeAlert.message}</p>
+    <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 max-w-lg w-full px-4 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-auto">
+      <div className={`p-3.5 sm:p-4 rounded-2xl border shadow-xl flex items-center justify-between gap-3.5 ${style}`}>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`p-2 rounded-xl shrink-0 ${currentIconBg}`}>
+            {icon}
+          </div>
+          <div className="min-w-0">
+            {activeAlert.title && (
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5f6368] block">
+                {activeAlert.title}
+              </span>
+            )}
+            <p className="text-xs sm:text-sm font-bold text-[#202124] leading-snug truncate">
+              {activeAlert.message}
+            </p>
           </div>
         </div>
-        <button
-          onClick={clearActiveAlert}
-          className="p-1 rounded-lg hover:bg-white/10 transition-colors opacity-70 hover:opacity-100"
-        >
-          <X className="w-4 h-4" />
-        </button>
+
+        <div className="flex items-center gap-2 shrink-0">
+          {activeAlert.actionLabel && (
+            <button
+              onClick={handleAction}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#1a73e8] hover:bg-[#1557d0] text-white font-bold text-xs shadow-sm transition-all"
+            >
+              <span>{activeAlert.actionLabel}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          <button
+            onClick={clearActiveAlert}
+            className="p-1.5 rounded-full text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] transition-colors"
+            title="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
