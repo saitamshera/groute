@@ -74,7 +74,7 @@ export function MemberList() {
       </div>
 
       {/* Members List */}
-      <div className="flex-1 overflow-y-auto p-2.5 sm:p-3 space-y-2">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-3 space-y-2">
         {travelers.map((traveler) => {
           const isSelected = selectedMemberId === traveler.id;
           const isLeader = traveler.isLeader;
@@ -84,194 +84,125 @@ export function MemberList() {
           const isOffline = traveler.status === 'OFFLINE' || traveler.status === 'STALE';
           const isSharingOff = traveler.isSharingOff;
 
+          let statusIcon = '🟢';
+          let statusText = 'Moving';
+          let statusColor = 'text-[#1e8e3e]';
+
+          if (isArrived) {
+            statusIcon = '🏁';
+            statusText = 'Arrived';
+            statusColor = 'text-[#137333]';
+          } else if (isStopped) {
+            statusIcon = '🔴';
+            statusText = 'Stopped';
+            statusColor = 'text-[#d93025]';
+          } else if (isOffline || isSharingOff) {
+            statusIcon = '⚪';
+            statusText = 'Offline';
+            statusColor = 'text-[#80868b]';
+          }
+
           return (
             <div
               key={traveler.id}
               onClick={() => focusMember(traveler.id)}
               className={`p-3 rounded-2xl border transition-all cursor-pointer ${
                 isSelected
-                  ? 'bg-[#e8f0fe] border-[#1a73e8] shadow-sm ring-1 ring-[#1a73e8]'
-                  : isLeader
-                  ? 'bg-[#fffdf7] hover:bg-[#fff9e6] border-[#fce8b2]'
-                  : isArrived
-                  ? 'bg-[#f6fbf7] hover:bg-[#eef8f0] border-[#ceead6]'
+                  ? 'bg-[#e8f0fe] border-[#1a73e8] shadow-sm'
                   : 'bg-white hover:bg-[#f8f9fa] border-[#dadce0]'
               }`}
             >
-              {/* Header: Avatar, Name, Badges, Status Pill */}
-              <div className="flex items-start justify-between gap-2">
+              {/* Row 1: Avatar, Name, Badges, Status + Speed */}
+              <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  {/* Avatar with Status Ring */}
-                  <div className="relative shrink-0">
-                    <img
-                      src={traveler.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${traveler.name}`}
-                      alt={traveler.name}
-                      className={`w-9 h-9 rounded-full bg-[#f1f3f4] border object-cover ${
-                        isLeader ? 'border-[#f9ab00] ring-2 ring-[#f9ab00]/40' : isArrived ? 'border-[#1e8e3e] ring-2 ring-[#1e8e3e]/30' : 'border-[#dadce0]'
-                      }`}
-                    />
-                    {isArrived && (
-                      <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-[#1e8e3e] ring-2 ring-white flex items-center justify-center text-[8px] text-white font-extrabold">✓</span>
-                    )}
-                    {isLeader && !isArrived && (
-                      <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-[#f9ab00] ring-2 ring-white flex items-center justify-center text-[7px] text-white">👑</span>
-                    )}
-                    {!isLeader && !isArrived && traveler.status === 'MOVING' && (
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#1e8e3e] ring-2 ring-white animate-pulse" />
-                    )}
-                    {isStopped && (
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#d93025] ring-2 ring-white" />
-                    )}
-                    {isSplit && (
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#f9ab00] ring-2 ring-white" />
-                    )}
-                    {(isOffline || isSharingOff) && !isArrived && (
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#80868b] ring-2 ring-white" />
-                    )}
-                  </div>
-
-                  {/* Name & Freshness */}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-xs sm:text-sm font-bold text-[#202124] truncate">
+                  {/* Avatar */}
+                  <img
+                    src={traveler.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${traveler.name}`}
+                    alt={traveler.name}
+                    className="w-10 h-10 rounded-full bg-[#f1f3f4] border border-[#dadce0] shrink-0"
+                  />
+                  {/* Name & Badges */}
+                  <div className="min-w-0 flex flex-col justify-center">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-bold text-[#202124] truncate">
                         {traveler.name}
                       </span>
-                      {isLeader && (
-                        <span className="text-[9px] uppercase font-extrabold px-1.5 py-0.2 rounded-full bg-[#fef7e0] text-[#b06000] border border-[#feefc3]">
-                          👑 LEADER
-                        </span>
-                      )}
                       {traveler.isMe && (
-                        <span className="text-[8px] uppercase font-extrabold px-1.5 py-0.2 rounded-full bg-[#1a73e8] text-white">
+                        <span className="text-[9px] uppercase font-bold text-[#5f6368]">
                           YOU
                         </span>
                       )}
-                      {isArrived && (
-                        <span className="text-[8px] uppercase font-extrabold px-1.5 py-0.2 rounded-full bg-[#e6f4ea] text-[#137333] border border-[#ceead6]">
-                          🏁 ARRIVED
-                        </span>
-                      )}
                     </div>
-
-                    {/* Human readable location name */}
-                    <div className="flex items-center gap-1 mt-0.5 text-[11px] text-[#5f6368] truncate">
-                      <MapPin className="w-3 h-3 text-[#5f6368] shrink-0" />
-                      <span className="truncate font-medium text-[#3c4043]">
-                        {traveler.locationName}
-                      </span>
-                    </div>
-
-                    {/* Freshness Update Time */}
-                    <p className="text-[10px] text-[#80868b] mt-0.5 truncate">
-                      {isArrived
-                        ? `Reached at ${traveler.arrivedAtTimeText || 'destination'}`
-                        : isSharingOff
-                        ? 'Sharing disabled'
-                        : isOffline
-                        ? 'Location unavailable'
-                        : traveler.lastSeen
-                        ? `Updated ${timeAgo(traveler.lastSeen)}`
-                        : 'Connecting...'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Status & Speed Badge */}
-                <StatusBadge
-                  status={traveler.status}
-                  speed={traveler.speed}
-                  distance={traveler.distanceFromGroupKm}
-                />
-              </div>
-
-              {/* Stop Callout Banner with Proximity POIs */}
-              {isStopped && (
-                <div className="mt-2 p-2 rounded-xl bg-[#fce8e6] border border-[#fad2cf] text-xs text-[#c5221f] space-y-1">
-                  <div className="flex items-center justify-between gap-1.5">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span>🛑</span>
-                      <span className="truncate font-semibold">
-                        {traveler.stoppedLocationName || 'Rest Stop'}
-                      </span>
-                    </div>
-                    {traveler.stopDurationText && (
-                      <span className="font-bold shrink-0 bg-white/80 px-1.5 py-0.2 rounded-full border border-[#fad2cf] text-[10px]">
-                        {traveler.stopDurationText}
+                    {isLeader && !isArrived && (
+                      <span className="text-[10px] uppercase font-extrabold text-[#b06000]">
+                        👑 LEADER
                       </span>
                     )}
                   </div>
+                </div>
+
+                {/* Status indicator right side */}
+                <div className={`text-right flex flex-col items-end ${statusColor}`}>
+                  <div className="flex items-center gap-1 font-bold text-xs">
+                    <span>{statusIcon}</span>
+                    <span>{statusText}</span>
+                  </div>
+                  {(traveler.status === 'MOVING' || traveler.status === 'REJOINED' || traveler.status === 'SPLIT' || traveler.status === 'FALLING_BEHIND') && traveler.speed !== null && (
+                    <span className="text-[11px] font-bold mt-0.5">{formatSpeed(traveler.speed)}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Row 2: Location */}
+              <div className="mt-2.5 flex items-start gap-1.5 text-xs text-[#5f6368]">
+                <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span className="truncate">{traveler.locationName || 'Location resolving...'}</span>
+              </div>
+
+              {/* Stop Special Banner (Only if stopped) */}
+              {isStopped && (
+                <div className="mt-2 text-xs text-[#d93025] flex flex-col gap-1">
+                  <span className="font-bold flex items-center gap-1">
+                    <span>🛑</span> Stopped for {traveler.stopDurationText || 'a few moments'}
+                  </span>
                   {traveler.isLongStop && (
-                    <div className="text-[10px] font-bold text-[#b06000] bg-[#fff8e1] px-2 py-0.5 rounded-md border border-[#ffe082]">
-                      ⚠ Stationary for 10+ minutes
-                    </div>
+                    <span className="text-[#b06000] font-bold flex items-center gap-1">
+                      <span>⚠</span> 10-min stop detected
+                    </span>
                   )}
                   {traveler.nearbyPetrol && (
-                    <div className="text-[10px] text-[#202124] bg-white/90 px-2 py-0.5 rounded-md border border-[#fad2cf] flex items-center gap-1">
-                      <span>⛽</span>
-                      <span className="truncate font-medium">{traveler.nearbyPetrol.name} ({traveler.nearbyPetrol.distanceText})</span>
-                    </div>
+                    <span className="text-[#202124] flex items-center gap-1">
+                      <span>⛽</span> {traveler.nearbyPetrol.name} nearby
+                    </span>
                   )}
                   {traveler.nearbyHotel && (
-                    <div className="text-[10px] text-[#202124] bg-white/90 px-2 py-0.5 rounded-md border border-[#fad2cf] flex items-center gap-1">
-                      <span>🏨</span>
-                      <span className="truncate font-medium">{traveler.nearbyHotel.name} ({traveler.nearbyHotel.distanceText})</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Split Warning Banner with Exact Separation Distance */}
-              {isSplit && (
-                <div className="mt-2 p-2 rounded-xl bg-[#fef7e0] border border-[#feefc3] text-xs text-[#b06000] flex items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <AlertTriangle className="w-3.5 h-3.5 text-[#f9ab00] shrink-0" />
-                    <span className="truncate font-bold">
-                      {traveler.distanceFromGroupKm ? `⚠ ${traveler.distanceFromGroupKm} km behind convoy` : 'Falling behind'}
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-semibold bg-white/80 px-1.5 py-0.2 rounded-full border border-[#feefc3] shrink-0">
-                    Separated
-                  </span>
-                </div>
-              )}
-
-              {/* Arrived Banner */}
-              {isArrived && (
-                <div className="mt-2 p-2 rounded-xl bg-[#e6f4ea] border border-[#ceead6] text-xs text-[#137333] flex items-center justify-between gap-1.5">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#1e8e3e] shrink-0" />
-                    <span className="truncate font-bold">
-                      Arrived at {trip?.destination || 'Destination'}
-                    </span>
-                  </div>
-                  {traveler.arrivedAtTimeText && (
-                    <span className="text-[10px] font-semibold bg-white px-1.5 py-0.2 rounded-full border border-[#ceead6] shrink-0">
-                      {traveler.arrivedAtTimeText}
+                    <span className="text-[#202124] flex items-center gap-1">
+                      <span>🏨</span> {traveler.nearbyHotel.name} nearby
                     </span>
                   )}
                 </div>
               )}
 
-              {/* Live Convoy Telemetry Metrics Bar */}
+              {/* Row 3: 3 Compact Metrics */}
               {!isSharingOff && !isOffline && traveler.latitude && !isArrived && (
-                <div className="mt-2 pt-1.5 border-t border-[#f1f3f4] grid grid-cols-3 gap-1.5 text-center text-xs">
-                  <div className="bg-[#f8f9fa] p-1.5 rounded-xl border border-[#dadce0]">
-                    <span className="text-[9px] text-[#5f6368] block font-medium">Position</span>
-                    <span className={`font-mono font-bold text-[10px] leading-tight block truncate ${isSplit ? 'text-[#b06000]' : isLeader ? 'text-[#b06000]' : 'text-[#202124]'}`} title={traveler.relativePositionText}>
+                <div className="mt-3 flex items-center justify-between text-xs border-t border-[#f1f3f4] pt-2">
+                  <div className="flex flex-col flex-1 truncate pr-1">
+                    <span className="text-[10px] text-[#5f6368] font-medium">Position</span>
+                    <span className={`font-bold truncate ${isSplit ? 'text-[#b06000]' : 'text-[#202124]'}`}>
                       {traveler.relativePositionText || (isLeader ? 'Leader' : 'With group')}
                     </span>
                   </div>
 
-                  <div className="bg-[#f8f9fa] p-1.5 rounded-xl border border-[#dadce0]">
-                    <span className="text-[9px] text-[#5f6368] block font-medium">Speed</span>
-                    <span className="font-mono font-bold text-[11px] text-[#202124]">
+                  <div className="flex flex-col flex-1 px-1 border-l border-[#f1f3f4]">
+                    <span className="text-[10px] text-[#5f6368] font-medium">Speed</span>
+                    <span className="font-mono font-bold text-[#202124]">
                       {isStopped ? '0 km/h' : traveler.speed !== null ? formatSpeed(traveler.speed) : '--'}
                     </span>
                   </div>
 
-                  <div className="bg-[#f8f9fa] p-1.5 rounded-xl border border-[#dadce0]">
-                    <span className="text-[9px] text-[#5f6368] block font-medium">ETA</span>
-                    <span className="font-mono font-bold text-[11px] text-[#1a73e8]">
+                  <div className="flex flex-col flex-1 pl-1 border-l border-[#f1f3f4] text-right">
+                    <span className="text-[10px] text-[#5f6368] font-medium">ETA</span>
+                    <span className="font-mono font-bold text-[#1a73e8]">
                       {traveler.eta || 'N/A'}
                     </span>
                   </div>

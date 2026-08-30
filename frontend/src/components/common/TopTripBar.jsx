@@ -43,22 +43,22 @@ export function TopTripBar({ onStartTrip, onEndTrip }) {
   };
 
   return (
-    <div className="absolute top-2.5 sm:top-3 left-2.5 right-2.5 sm:left-4 sm:right-4 z-30 pointer-events-none flex items-center justify-between gap-1.5 sm:gap-2">
+    <div className="absolute top-4 left-4 z-30 pointer-events-none flex items-center justify-between gap-2 max-w-[680px] w-[calc(100%-32px)]">
       {/* Sleek Compact Google Maps Navigation Bar */}
-      <div className="pointer-events-auto flex items-center gap-1 sm:gap-2 bg-white/95 backdrop-blur-md border border-[#dadce0] p-1 sm:p-1.5 rounded-full shadow-md hover:shadow-lg transition-all min-w-0 max-w-[calc(100vw-110px)] sm:max-w-xl">
+      <div className="pointer-events-auto flex items-center gap-2 bg-white/95 backdrop-blur-md border border-[#dadce0] p-1.5 rounded-full shadow-md hover:shadow-lg transition-all min-w-0 flex-1">
         {/* Back Button */}
         <Link
           to="/dashboard"
           title="Back to Dashboard"
-          className="p-1.5 sm:p-2 rounded-full text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] transition-colors shrink-0"
+          className="p-2 rounded-full text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] transition-colors shrink-0"
         >
           <ArrowLeft className="w-4 h-4" />
         </Link>
 
         {/* Route Title & Status */}
-        <div className="flex items-center gap-1 sm:gap-1.5 px-1 sm:px-2 min-w-0">
+        <div className="flex items-center gap-1.5 px-2 min-w-0 flex-1">
           <Navigation className="w-3.5 h-3.5 text-[#1a73e8] shrink-0 transform -rotate-45 hidden xs:block" />
-          <span className="text-xs sm:text-sm font-bold text-[#202124] truncate leading-tight">
+          <span className="text-sm font-bold text-[#202124] truncate leading-tight">
             {trip.origin} → {trip.destination}
           </span>
           <span
@@ -68,15 +68,15 @@ export function TopTripBar({ onStartTrip, onEndTrip }) {
                 : 'bg-[#f1f3f4] text-[#5f6368] border border-[#dadce0]'
             }`}
           >
-            {isActive ? '● Live' : trip.status}
+            {isActive ? '● LIVE' : trip.status}
           </span>
         </div>
 
         {/* Clustered Group ETA */}
-        <div className="hidden md:flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#f8f9fa] border border-[#dadce0] text-xs shrink-0">
+        <div className="hidden md:flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#f8f9fa] border border-[#dadce0] text-xs shrink-0 mr-1">
           <Clock className="w-3 h-3 text-[#1a73e8]" />
           <span className="font-mono font-bold text-[#1a73e8] text-[11px]">
-            {groupEta?.formattedEta || 'Calculating...'}
+            ETA {groupEta?.formattedEta || '...'}
           </span>
         </div>
 
@@ -84,9 +84,9 @@ export function TopTripBar({ onStartTrip, onEndTrip }) {
         {isOwner && trip.status === 'PLANNED' && (
           <button
             onClick={onStartTrip}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#1e8e3e] hover:bg-[#137333] text-white font-bold text-xs shadow-xs transition-colors shrink-0"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#1e8e3e] hover:bg-[#137333] text-white font-bold text-xs shadow-xs transition-colors shrink-0 mr-1"
           >
-            <Play className="w-3 h-3" />
+            <Play className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Start</span>
           </button>
         )}
@@ -94,39 +94,26 @@ export function TopTripBar({ onStartTrip, onEndTrip }) {
         {isOwner && isActive && (
           <button
             onClick={onEndTrip}
-            className="flex items-center gap-1 px-2 py-1 rounded-full bg-white hover:bg-[#fce8e6] text-[#d93025] font-bold text-xs border border-[#dadce0] hover:border-[#d93025] transition-colors shrink-0"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white hover:bg-[#fce8e6] text-[#d93025] font-bold text-xs border border-[#dadce0] hover:border-[#d93025] transition-colors shrink-0 mr-1"
           >
-            <CheckCircle className="w-3 h-3" />
+            <CheckCircle className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">End</span>
           </button>
         )}
       </div>
 
       {/* Convoy Travelers Quick Trigger Pill (Top-Right) */}
-      <div className="pointer-events-auto shrink-0">
+      <div className="pointer-events-auto shrink-0 hidden md:block">
         <button
           onClick={() => handleToggleDrawer('MEMBERS')}
-          className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full border shadow-md transition-all text-xs font-bold shrink-0 ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border shadow-md transition-all text-xs font-bold ${
             isDrawerOpen && activeDrawerTab === 'MEMBERS'
               ? 'bg-[#1a73e8] text-white border-[#1a73e8]'
               : 'bg-white/95 backdrop-blur-md text-[#202124] border-[#dadce0] hover:bg-[#f8f9fa]'
           }`}
         >
           <Users className="w-3.5 h-3.5" />
-          <span>{travelers.length}</span>
-          <span className="hidden sm:inline">Travelers</span>
-
-          {/* Micro status alerts */}
-          {stoppedCount > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-[#d93025] text-white text-[9px] font-bold">
-              {stoppedCount} 🛑
-            </span>
-          )}
-          {splitCount > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-[#f9ab00] text-[#202124] text-[9px] font-bold">
-              {splitCount} ⚠
-            </span>
-          )}
+          <span>{travelers.length} Travelers</span>
         </button>
       </div>
     </div>

@@ -24,7 +24,19 @@ export function useSocket(tripId) {
       socket.emit('join_trip', { tripId });
     }
 
-    function onDisconnect() {
+    function onDisconnect(reason) {
+      if (reason === 'io server disconnect' || reason === 'io client disconnect') {
+        setConnectionStatus('disconnected');
+      } else {
+        setConnectionStatus('reconnecting');
+      }
+    }
+
+    function onReconnectAttempt() {
+      setConnectionStatus('reconnecting');
+    }
+
+    function onReconnectFailed() {
       setConnectionStatus('disconnected');
     }
 
@@ -91,6 +103,8 @@ export function useSocket(tripId) {
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
+    socket.on('reconnect_attempt', onReconnectAttempt);
+    socket.on('reconnect_failed', onReconnectFailed);
     socket.on('locations:snapshot', onLocationsSnapshot);
     socket.on('location:update', onLocationUpdate);
     socket.on('trip:state', onTripState);
@@ -109,6 +123,8 @@ export function useSocket(tripId) {
       socket.emit('leave_trip', { tripId });
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
+      socket.off('reconnect_attempt', onReconnectAttempt);
+      socket.off('reconnect_failed', onReconnectFailed);
       socket.off('locations:snapshot', onLocationsSnapshot);
       socket.off('location:update', onLocationUpdate);
       socket.off('trip:state', onTripState);

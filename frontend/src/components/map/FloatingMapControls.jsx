@@ -20,7 +20,8 @@ export function FloatingMapControls({ showSimPanel, setShowSimPanel }) {
     focusLocation,
     liveLocations,
     layerVisibility,
-    toggleLayer
+    toggleLayer,
+    isDrawerOpen
   } = useTripStore();
   const { user } = useAuthStore();
 
@@ -56,7 +57,7 @@ export function FloatingMapControls({ showSimPanel, setShowSimPanel }) {
   };
 
   return (
-    <div className="absolute right-3 sm:right-4 bottom-22 sm:bottom-6 z-20 flex flex-col items-end gap-2 pointer-events-auto">
+    <div className={`absolute bottom-22 sm:bottom-6 z-20 flex flex-col items-end gap-2 pointer-events-auto transition-all duration-300 ${isDrawerOpen ? 'right-4 md:right-[410px]' : 'right-4'}`}>
       {/* Layer Visibility Menu Popup */}
       {isLayerMenuOpen && (
         <div className="bg-white/95 backdrop-blur-md border border-[#dadce0] p-3 rounded-2xl shadow-xl mb-1 w-52 space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150 text-xs">

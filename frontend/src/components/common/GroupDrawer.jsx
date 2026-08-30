@@ -38,46 +38,57 @@ export function GroupDrawer() {
     <>
       {/* 1. DESKTOP FLOATING DRAWER (Right side of screen over the map) */}
       {isDrawerOpen && (
-        <div className="hidden md:flex absolute top-18 right-4 bottom-6 z-50 w-88 lg:w-96 flex-col bg-white border border-[#dadce0] rounded-3xl shadow-xl overflow-hidden pointer-events-auto animate-in fade-in slide-in-from-right-4 duration-200">
+        <div className="hidden md:flex absolute top-[90px] right-4 bottom-4 z-40 w-[380px] flex-col bg-white border border-[#dadce0] rounded-3xl shadow-xl overflow-hidden pointer-events-auto animate-in fade-in slide-in-from-right-4 duration-200">
           {/* Navigation Tabs Header */}
-          <div className="p-2.5 border-b border-[#dadce0] flex items-center justify-between bg-[#f8f9fa]">
-            <div className="flex items-center gap-1 bg-[#f1f3f4] p-0.5 rounded-full text-xs">
-              <button
-                onClick={() => setActiveDrawerTab('MEMBERS')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold transition-all ${
-                  activeDrawerTab === 'MEMBERS'
-                    ? 'bg-white text-[#1a73e8] shadow-xs'
-                    : 'text-[#5f6368] hover:text-[#202124]'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>Travelers ({travelers.length})</span>
-              </button>
+          <div className="p-3 border-b border-[#dadce0] bg-[#f8f9fa] flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 bg-[#f1f3f4] p-0.5 rounded-full text-[11px]">
+                <button
+                  onClick={() => setActiveDrawerTab('MEMBERS')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold transition-all ${
+                    activeDrawerTab === 'MEMBERS'
+                      ? 'bg-white text-[#1a73e8] shadow-sm'
+                      : 'text-[#5f6368] hover:text-[#202124]'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Travelers ({travelers.length})</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveDrawerTab('TIMELINE')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold transition-all ${
+                    activeDrawerTab === 'TIMELINE'
+                      ? 'bg-white text-[#1a73e8] shadow-sm'
+                      : 'text-[#5f6368] hover:text-[#202124]'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Timeline ({events.length})</span>
+                </button>
+              </div>
 
               <button
-                onClick={() => setActiveDrawerTab('TIMELINE')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold transition-all ${
-                  activeDrawerTab === 'TIMELINE'
-                    ? 'bg-white text-[#1a73e8] shadow-xs'
-                    : 'text-[#5f6368] hover:text-[#202124]'
-                }`}
+                onClick={() => setDrawerOpen(false)}
+                className="p-1.5 rounded-full text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] transition-colors"
+                title="Close Panel"
               >
-                <Clock className="w-3.5 h-3.5" />
-                <span>Timeline ({events.length})</span>
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <button
-              onClick={() => setDrawerOpen(false)}
-              className="p-1.5 rounded-full text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] transition-colors"
-              title="Close Panel"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-bold text-[#5f6368]">
+                {movingCount} Moving · {stoppedCount} Stopped
+              </span>
+              <span className="text-[10px] font-bold text-[#1e8e3e]">
+                Sharing ON
+              </span>
+            </div>
           </div>
 
           {/* Tab Content */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden relative">
             {activeDrawerTab === 'MEMBERS' ? <MemberList /> : <TripTimeline />}
           </div>
         </div>
@@ -85,18 +96,18 @@ export function GroupDrawer() {
 
       {/* 2. MOBILE 3-STATE EXPANDABLE BOTTOM SHEET */}
       <div
-        className={`md:hidden fixed inset-x-0 bottom-0 z-50 bg-white border-t border-[#dadce0] rounded-t-3xl shadow-2xl transition-all duration-300 pointer-events-auto flex flex-col ${
+        className={`md:hidden fixed inset-x-0 bottom-0 z-40 bg-white border-t border-[#dadce0] rounded-t-3xl shadow-2xl transition-all duration-300 pointer-events-auto flex flex-col ${
           mobileSheetState === 'FULL'
-            ? 'h-[82vh]'
+            ? 'h-[65vh]'
             : mobileSheetState === 'PARTIAL'
-            ? 'h-[45vh]'
+            ? 'h-[40vh]'
             : 'h-14'
         }`}
       >
         {/* Sheet Drag Handle & Peek Bar */}
         <div
           onClick={cycleMobileSheet}
-          className="p-2.5 px-3.5 flex items-center justify-between cursor-pointer border-b border-[#f1f3f4] shrink-0 bg-white rounded-t-3xl relative"
+          className="p-3 px-4 flex items-center justify-between cursor-pointer border-b border-[#f1f3f4] shrink-0 bg-white rounded-t-3xl relative"
         >
           {/* Top Pill Handle Indicator */}
           <div className="w-9 h-1 bg-[#dadce0] rounded-full absolute top-1.5 left-1/2 transform -translate-x-1/2" />
@@ -106,25 +117,15 @@ export function GroupDrawer() {
             <span className="font-bold text-xs text-[#202124] truncate">
               {travelers.length} Travelers
             </span>
-            <div className="flex items-center gap-1 shrink-0 text-[10px]">
+            <div className="flex items-center gap-2 shrink-0 text-[10px]">
               {movingCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-[#e6f4ea] text-[#137333] font-bold">
+                <span className="text-[#137333] font-bold">
                   🟢 {movingCount}
                 </span>
               )}
               {stoppedCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-[#fce8e6] text-[#c5221f] font-bold">
-                  🛑 {stoppedCount}
-                </span>
-              )}
-              {splitCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-[#fef7e0] text-[#b06000] font-bold">
-                  ⚠ {splitCount}
-                </span>
-              )}
-              {arrivedCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-[#e6f4ea] text-[#137333] font-bold">
-                  🏁 {arrivedCount}
+                <span className="text-[#c5221f] font-bold">
+                  🔴 {stoppedCount}
                 </span>
               )}
             </div>

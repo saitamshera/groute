@@ -105,67 +105,47 @@ export function TripDashboard() {
       )}
 
       {/* 6. SLEEK BOTTOM CONVOY STATUS BAR (Google Maps style) */}
-      <div className="absolute bottom-3 sm:bottom-4 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto flex items-center gap-1.5 sm:gap-2 max-w-[95vw] sm:max-w-2xl">
+      <div className="absolute bottom-5 left-5 z-20 pointer-events-auto flex flex-col gap-2">
         <button
           onClick={() => {
             setActiveDrawerTab('MEMBERS');
             setDrawerOpen(true);
           }}
-          className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/95 backdrop-blur-md border border-[#dadce0] shadow-md hover:shadow-lg hover:bg-white text-xs font-bold text-[#202124] transition-all flex-wrap sm:flex-nowrap"
+          className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/95 backdrop-blur-md border border-[#dadce0] shadow-md hover:shadow-lg hover:bg-white text-xs font-bold text-[#202124] transition-all min-w-[300px] max-w-[400px]"
         >
           <div className="flex items-center gap-1.5 text-[#1a73e8]">
-            <Users className="w-3.5 h-3.5" />
+            <Users className="w-4 h-4" />
             <span>{travelers.length} Travelers</span>
           </div>
 
-          {leaderTraveler && (
-            <span className="hidden md:inline-flex items-center gap-1 text-[9px] font-extrabold text-[#b06000] bg-[#fef7e0] px-2 py-0.2 rounded-full border border-[#feefc3]">
-              👑 {leaderTraveler.name}
-            </span>
-          )}
+          <div className="h-4 w-px bg-[#dadce0]" />
 
-          <div className="h-3 w-px bg-[#dadce0]" />
-
-          <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-[11px]">
+          <div className="flex items-center gap-2 flex-1 justify-center">
             {movingCount > 0 && (
               <span className="text-[#137333] flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#1e8e3e] animate-pulse" />
-                <span>{movingCount} moving</span>
+                <span>🟢</span>
+                <span>{movingCount} Moving</span>
               </span>
             )}
             {stoppedCount > 0 && (
               <span className="text-[#d93025] flex items-center gap-1">
                 <span>🔴</span>
-                <span>{stoppedCount} stopped</span>
+                <span>{stoppedCount} Stopped</span>
               </span>
             )}
-            {splitCount > 0 && (
-              <span className="text-[#b06000] flex items-center gap-1">
-                <span>⚠</span>
-                <span>{splitCount} behind</span>
-              </span>
-            )}
-            {arrivedCount > 0 && (
-              <span className="text-[#137333] flex items-center gap-1">
-                <span>🏁</span>
-                <span>{arrivedCount} arrived</span>
-              </span>
-            )}
-            {movingCount === 0 && stoppedCount === 0 && splitCount === 0 && arrivedCount === 0 && (
+            {movingCount === 0 && stoppedCount === 0 && arrivedCount === 0 && (
               <span className="text-[#5f6368]">Standby</span>
             )}
           </div>
-
-          <div className="h-3 w-px bg-[#dadce0] hidden sm:block" />
-
-          <span className="text-[#1a73e8] hidden sm:flex items-center gap-0.5 hover:underline text-[11px]">
-            <span>View Group</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </span>
         </button>
-
-        {showSimPanel && <DemoController />}
       </div>
+
+      {/* DEMO CONTROLLER - Centered at bottom */}
+      {showSimPanel && (
+        <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 z-20 pointer-events-auto">
+          <DemoController />
+        </div>
+      )}
 
       {/* 7. FLOATING GROUP MEMBERS & TIMELINE DRAWER / 3-STATE BOTTOM SHEET */}
       <GroupDrawer />
