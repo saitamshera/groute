@@ -37,7 +37,7 @@ export function App() {
   }, []);
 
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="min-h-screen bg-[#f8f9fa] text-[#202124] flex flex-col font-sans">
         <Navbar />
         <main className="flex-1">

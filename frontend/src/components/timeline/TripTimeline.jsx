@@ -17,11 +17,25 @@ export function TripTimeline() {
           description: `${event.user_name} initiated convoy travel.`
         };
       case 'STOP_STARTED':
+        let stopDesc = `Stopped at ${event.location_name || event.metadata?.locationName || 'Highway Rest Point'}.`;
+        if (event.metadata?.nearbyPetrol?.name) {
+          stopDesc += ` (Near ⛽ ${event.metadata.nearbyPetrol.name})`;
+        } else if (event.metadata?.nearbyHotel?.name) {
+          stopDesc += ` (Near 🏨 ${event.metadata.nearbyHotel.name})`;
+        }
         return {
           icon: <span className="text-sm leading-none">🛑</span>,
           badgeBg: 'bg-[#fce8e6] text-[#c5221f] border-[#fad2cf]',
           title: `${event.user_name} stopped`,
-          description: `Stopped at ${event.location_name || event.metadata?.locationName || 'Highway Rest Point'}`
+          description: stopDesc
+        };
+      case 'LONG_STOP':
+      case 'TEN_MINUTE_STOP':
+        return {
+          icon: <span className="text-sm leading-none">🛑</span>,
+          badgeBg: 'bg-[#fce8e6] text-[#c5221f] border-[#fad2cf]',
+          title: '10-Minute Stop Alert',
+          description: `${event.user_name} has been stopped for 10+ minutes at ${event.location_name || 'Highway Corridor'}.`
         };
       case 'STOP_ENDED':
         const durationText = event.metadata?.durationMinutes ? `${event.metadata.durationMinutes} min` : 'a short break';
@@ -31,6 +45,7 @@ export function TripTimeline() {
           title: `${event.user_name} resumed driving`,
           description: `Resumed travel after ${durationText} at ${event.location_name || 'Rest Area'}`
         };
+      case 'SEPARATION_ALERT':
       case 'MEMBER_FELL_BEHIND':
       case 'GROUP_SPLIT':
         const dist = event.metadata?.distanceKm || '5+';
@@ -38,21 +53,31 @@ export function TripTimeline() {
           icon: <AlertTriangle className="w-3.5 h-3.5 text-[#f9ab00]" />,
           badgeBg: 'bg-[#fef7e0] text-[#b06000] border-[#feefc3]',
           title: 'Separation Alert',
-          description: `${event.user_name} is ${dist} km behind group centroid.`
+          description: `${event.user_name} is ${dist} km behind the convoy.`
         };
       case 'MEMBER_REJOINED':
         return {
           icon: <CheckCircle2 className="w-3.5 h-3.5 text-[#1e8e3e]" />,
           badgeBg: 'bg-[#e6f4ea] text-[#137333] border-[#ceead6]',
           title: 'Member Rejoined',
-          description: `${event.user_name} rejoined the convoy convoy.`
+          description: `${event.user_name} rejoined the group convoy.`
         };
+      case 'MEMBER_ARRIVED':
+      case 'ARRIVED':
+        return {
+          icon: <Flag className="w-3.5 h-3.5 text-[#1e8e3e]" />,
+          badgeBg: 'bg-[#e6f4ea] text-[#137333] border-[#ceead6]',
+          title: `${event.user_name} arrived`,
+          description: `Reached destination safely at ${event.location_name || 'Destination Point'}.`
+        };
+      case 'ALL_MEMBERS_ARRIVED':
+      case 'ALL_ARRIVED':
       case 'TRIP_COMPLETED':
         return {
           icon: <Flag className="w-3.5 h-3.5 text-[#7627bb]" />,
           badgeBg: 'bg-[#f3e8fd] text-[#7627bb] border-[#e9d5ff]',
-          title: 'Destination Reached',
-          description: 'Group reached destination safely.'
+          title: 'Everyone Has Arrived',
+          description: event.metadata?.message || 'All group travelers have reached the destination safely!'
         };
       default:
         return {

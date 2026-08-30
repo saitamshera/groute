@@ -27,6 +27,12 @@ export function CanvasMapVisualizer(props = {}) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
+  // References to maintain stable event listeners without thrashing
+  const panRef = useRef(pan);
+  panRef.current = pan;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
   const rawPois = props?.pois !== undefined ? props.pois : storePOIs;
   const pois = Array.isArray(rawPois) ? rawPois : [];
 
@@ -79,7 +85,76 @@ export function CanvasMapVisualizer(props = {}) {
     }
   }, [mapFocus]);
 
-  // Mouse pan handlers
+  // Stable non-passive wheel and touch event listeners attached to DOM container
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Non-passive wheel handler: safely calls preventDefault() to zoom without page scrolling
+    const onWheel = (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.15 : 0.15;
+      setZoom((prev) => Math.max(0.75, Math.min(3.5, prev + delta)));
+    };
+
+    let touchStartPan = null;
+    let initialPinchDistance = null;
+    let initialZoomOnPinch = 1;
+
+    const onTouchStart = (e) => {
+      if (e.touches.length === 1) {
+        touchStartPan = {
+          x: e.touches[0].clientX - panRef.current.x,
+          y: e.touches[0].clientY - panRef.current.y
+        };
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        initialPinchDistance = Math.hypot(dx, dy);
+        initialZoomOnPinch = zoomRef.current;
+      }
+    };
+
+    const onTouchMove = (e) => {
+      if (e.touches.length === 1 && touchStartPan) {
+        e.preventDefault();
+        setPan({
+          x: e.touches[0].clientX - touchStartPan.x,
+          y: e.touches[0].clientY - touchStartPan.y
+        });
+      } else if (e.touches.length === 2 && initialPinchDistance) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const currentDistance = Math.hypot(dx, dy);
+        if (initialPinchDistance > 0) {
+          const scale = currentDistance / initialPinchDistance;
+          setZoom(Math.max(0.75, Math.min(3.5, initialZoomOnPinch * scale)));
+        }
+      }
+    };
+
+    const onTouchEnd = () => {
+      touchStartPan = null;
+      initialPinchDistance = null;
+    };
+
+    container.addEventListener('wheel', onWheel, { passive: false });
+    container.addEventListener('touchmove', onTouchMove, { passive: false });
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
+    container.addEventListener('touchend', onTouchEnd, { passive: true });
+    container.addEventListener('touchcancel', onTouchEnd, { passive: true });
+
+    return () => {
+      container.removeEventListener('wheel', onWheel, { passive: false });
+      container.removeEventListener('touchmove', onTouchMove, { passive: false });
+      container.removeEventListener('touchstart', onTouchStart, { passive: true });
+      container.removeEventListener('touchend', onTouchEnd, { passive: true });
+      container.removeEventListener('touchcancel', onTouchEnd, { passive: true });
+    };
+  }, []);
+
+  // Desktop Mouse pan handlers
   const handleMouseDown = (e) => {
     if (e.button !== 0) return;
     setIsDragging(true);
@@ -95,12 +170,6 @@ export function CanvasMapVisualizer(props = {}) {
   };
 
   const handleMouseUp = () => setIsDragging(false);
-
-  const handleWheel = (e) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.15 : 0.15;
-    setZoom((prev) => Math.max(0.75, Math.min(3.5, prev + delta)));
-  };
 
   // Highway Waypoints along Delhi-Manali NH44 / NH21 highway
   const routeWaypoints = [
@@ -135,7 +204,6 @@ export function CanvasMapVisualizer(props = {}) {
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
-      onWheel={handleWheel}
       className="relative w-full h-full bg-[#f1f3f4] overflow-hidden select-none cursor-grab active:cursor-grabbing"
     >
       {/* Map Background Grid & Cartographic Canvas Layer */}
@@ -292,7 +360,7 @@ export function CanvasMapVisualizer(props = {}) {
         })}
 
         {/* POI Markers: Petrol Stations ⛽ */}
-        {layerVisibility?.petrol && (pois || []).filter(p => p.type === 'petrol').map((poi) => {
+        {layerVisibility?.petrol && (pois || []).filter(p => p.type === 'petrol' || p.type === 'FUEL').map((poi) => {
           if (!poi.latitude || !poi.longitude) return null;
           const proj = projectCoords(poi.latitude, poi.longitude);
           return (
@@ -314,7 +382,7 @@ export function CanvasMapVisualizer(props = {}) {
         })}
 
         {/* POI Markers: Hotels 🏨 */}
-        {layerVisibility?.hotels && (pois || []).filter(p => p.type === 'hotel').map((poi) => {
+        {layerVisibility?.hotels && (pois || []).filter(p => p.type === 'hotel' || p.type === 'HOTEL').map((poi) => {
           if (!poi.latitude || !poi.longitude) return null;
           const proj = projectCoords(poi.latitude, poi.longitude);
           return (

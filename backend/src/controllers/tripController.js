@@ -356,7 +356,21 @@ export const tripController = {
         return res.status(404).json({ error: 'Trip not found.' });
       }
 
-      const pois = await mapService.searchRouteCorridorPOIs();
+      // Verify membership
+      const membership = db.tables.get('group_members').find(
+        m => m.group_id === trip.group_id && m.user_id === req.user.id
+      );
+
+      if (!membership) {
+        return res.status(403).json({ error: 'You do not have access to this trip.' });
+      }
+
+      const pois = await mapService.searchRouteCorridorPOIs(
+        trip.origin_lat,
+        trip.origin_lng,
+        trip.destination_lat,
+        trip.destination_lng
+      );
       return res.json({ pois });
     } catch (err) {
       console.error('[Trip] Get POIs error:', err);

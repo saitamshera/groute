@@ -257,8 +257,8 @@ export function MemberList() {
                 <div className="mt-2 pt-1.5 border-t border-[#f1f3f4] grid grid-cols-3 gap-1.5 text-center text-xs">
                   <div className="bg-[#f8f9fa] p-1.5 rounded-xl border border-[#dadce0]">
                     <span className="text-[9px] text-[#5f6368] block font-medium">Position</span>
-                    <span className={`font-mono font-bold text-[11px] ${isSplit ? 'text-[#b06000]' : isLeader ? 'text-[#b06000]' : 'text-[#202124]'}`}>
-                      {isLeader ? 'Leader' : traveler.distanceFromGroupKm !== null ? `${formatDistance(traveler.distanceFromGroupKm)}` : 'With Convoy'}
+                    <span className={`font-mono font-bold text-[10px] leading-tight block truncate ${isSplit ? 'text-[#b06000]' : isLeader ? 'text-[#b06000]' : 'text-[#202124]'}`} title={traveler.relativePositionText}>
+                      {traveler.relativePositionText || (isLeader ? 'Leader' : 'With group')}
                     </span>
                   </div>
 

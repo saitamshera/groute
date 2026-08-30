@@ -382,18 +382,18 @@ export const mapService = {
   /**
    * Search Route Corridor POIs along highway
    */
-  async searchRouteCorridorPOIs() {
+  async searchRouteCorridorPOIs(originLat, originLng, destLat, destLng) {
     const defaultPOIs = [
-      { id: 'poi-murthal-petrol', name: 'HP Petrol Pump (Sukhdev Hub)', type: 'petrol', icon: '⛽', latitude: 29.0270, longitude: 77.0710, address: 'NH44 Murthal, Haryana' },
-      { id: 'poi-murthal-hotel', name: 'Hotel Highway King', type: 'hotel', icon: '🏨', latitude: 29.0280, longitude: 77.0725, address: 'Murthal Corridor, Haryana' },
-      { id: 'poi-karnal-petrol', name: 'Bharat Petroleum Oasis', type: 'petrol', icon: '⛽', latitude: 29.6860, longitude: 76.9910, address: 'Karnal Highway Oasis' },
-      { id: 'poi-karnal-hotel', name: 'Karnal Haveli Resort', type: 'hotel', icon: '🏨', latitude: 29.6870, longitude: 76.9920, address: 'GT Road, Karnal' },
-      { id: 'poi-swarghat-petrol', name: 'IndianOil Swarghat Hub', type: 'petrol', icon: '⛽', latitude: 31.2340, longitude: 76.7180, address: 'NH21 Swarghat, HP' },
-      { id: 'poi-bilaspur-hotel', name: 'Himachal Tourism Hotel', type: 'hotel', icon: '🏨', latitude: 31.3410, longitude: 76.7610, address: 'Bilaspur Lake Road' },
-      { id: 'poi-mandi-petrol', name: 'HP Petrol Pump Mandi', type: 'petrol', icon: '⛽', latitude: 31.7090, longitude: 76.9330, address: 'Mandi Highway By-Pass' },
-      { id: 'poi-kullu-hotel', name: 'River View Resort', type: 'hotel', icon: '🏨', latitude: 31.9590, longitude: 77.1105, address: 'Kullu Valley Highway' },
-      { id: 'poi-manali-petrol', name: 'IndianOil Fuel Station', type: 'petrol', icon: '⛽', latitude: 32.2380, longitude: 77.1870, address: 'Mall Road Approach, Manali' },
-      { id: 'poi-manali-hotel', name: 'Snow Valley Resort', type: 'hotel', icon: '🏨', latitude: 32.2400, longitude: 77.1895, address: 'Mall Road, Manali' }
+      { id: 'poi-murthal-fuel', name: 'HP Petrol Pump (Sukhdev Hub)', type: 'FUEL', categoryText: 'Petrol Station', icon: '⛽', latitude: 29.0270, longitude: 77.0710, address: 'NH44 Murthal, Haryana' },
+      { id: 'poi-murthal-hotel', name: 'Hotel Highway King', type: 'HOTEL', categoryText: 'Hotel', icon: '🏨', latitude: 29.0280, longitude: 77.0725, address: 'Murthal Corridor, Haryana' },
+      { id: 'poi-karnal-fuel', name: 'Bharat Petroleum Oasis', type: 'FUEL', categoryText: 'Petrol Station', icon: '⛽', latitude: 29.6860, longitude: 76.9910, address: 'Karnal Highway Oasis' },
+      { id: 'poi-karnal-hotel', name: 'Karnal Haveli Resort', type: 'HOTEL', categoryText: 'Hotel', icon: '🏨', latitude: 29.6870, longitude: 76.9920, address: 'GT Road, Karnal' },
+      { id: 'poi-swarghat-fuel', name: 'IndianOil Swarghat Hub', type: 'FUEL', categoryText: 'Petrol Station', icon: '⛽', latitude: 31.2340, longitude: 76.7180, address: 'NH21 Swarghat, HP' },
+      { id: 'poi-bilaspur-hotel', name: 'Himachal Tourism Hotel', type: 'HOTEL', categoryText: 'Hotel', icon: '🏨', latitude: 31.3410, longitude: 76.7610, address: 'Bilaspur Lake Road' },
+      { id: 'poi-mandi-fuel', name: 'HP Petrol Pump Mandi', type: 'FUEL', categoryText: 'Petrol Station', icon: '⛽', latitude: 31.7090, longitude: 76.9330, address: 'Mandi Highway By-Pass' },
+      { id: 'poi-kullu-hotel', name: 'River View Resort', type: 'HOTEL', categoryText: 'Hotel', icon: '🏨', latitude: 31.9590, longitude: 77.1105, address: 'Kullu Valley Highway' },
+      { id: 'poi-manali-fuel', name: 'IndianOil Fuel Station', type: 'FUEL', categoryText: 'Petrol Station', icon: '⛽', latitude: 32.2380, longitude: 77.1870, address: 'Mall Road Approach, Manali' },
+      { id: 'poi-manali-hotel', name: 'Snow Valley Resort', type: 'HOTEL', categoryText: 'Hotel', icon: '🏨', latitude: 32.2400, longitude: 77.1895, address: 'Mall Road, Manali' }
     ];
     return defaultPOIs;
   }

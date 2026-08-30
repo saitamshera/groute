@@ -1,43 +1,183 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { GoogleMap, useJsApiLoader, Marker, Polyline } from '@react-google-maps/api';
-import CanvasMapVisualizer from './CanvasMapVisualizer.jsx';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import useTripStore, { selectTravelers } from '../../store/tripStore.js';
 import useAuthStore from '../../store/authStore.js';
-import { Layers, Map as MapIcon, Key, AlertCircle, RefreshCw } from 'lucide-react';
 
-const libraries = ['places', 'geometry'];
+// Fix Leaflet default marker icon path issue in bundlers
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
 
-// Official Google Maps Light Theme Styling
-const googleMapsLightStyle = [
-  { elementType: 'geometry', stylers: [{ color: '#f8f9fa' }] },
-  { elementType: 'labels.icon', stylers: [{ visibility: 'on' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#3c4043' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#ffffff' }, { weight: 3 }] },
-  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#dadce0' }] },
-  { featureType: 'administrative.land_parcel', stylers: [{ visibility: 'off' }] },
-  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#202124' }] },
-  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#eeeeee' }] },
-  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#5f6368' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#e6f4ea' }] },
-  { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#137333' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#ffffff' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#e0e3e7' }] },
-  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#5f6368' }] },
-  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#fee6b9' }] },
-  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#fcd790' }] },
-  { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#3c4043' }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#f1f3f4' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#c5e1f9' }] },
-  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#185abc' }] }
+// ─── Custom Marker Icons ──────────────────────────────────────
+
+function createTravelerIcon(traveler) {
+  const isLeader = traveler.isLeader;
+  const isStopped = traveler.status === 'STOPPED' || traveler.status === 'POSSIBLE_STOP';
+  const isSplit = traveler.status === 'SPLIT' || traveler.status === 'FALLING_BEHIND';
+  const isArrived = traveler.status === 'ARRIVED';
+
+  let bgColor = '#1e8e3e'; // green - moving
+  let emoji = '🚗';
+  if (isLeader) { bgColor = '#1a73e8'; emoji = '👑'; }
+  if (isStopped) { bgColor = '#d93025'; emoji = '🛑'; }
+  if (isSplit) { bgColor = '#f9ab00'; emoji = '⚠️'; }
+  if (isArrived) { bgColor = '#7627bb'; emoji = '🏁'; }
+
+  const name = traveler.name?.split(' ')[0] || '?';
+
+  return L.divIcon({
+    className: 'leaflet-traveler-marker',
+    html: `
+      <div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);">
+        <div style="background:${bgColor};color:#fff;border-radius:16px;padding:3px 8px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25);border:2px solid #fff;display:flex;align-items:center;gap:3px;">
+          <span style="font-size:12px;">${emoji}</span>
+          <span>${name}</span>
+        </div>
+        <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${bgColor};margin-top:-1px;"></div>
+      </div>
+    `,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  });
+}
+
+function createOriginIcon() {
+  return L.divIcon({
+    className: 'leaflet-origin-marker',
+    html: `<div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);">
+      <div style="background:#137333;color:#fff;border-radius:16px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25);border:2px solid #fff;">🟢 Start</div>
+      <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #137333;margin-top:-1px;"></div>
+    </div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  });
+}
+
+function createDestinationIcon() {
+  return L.divIcon({
+    className: 'leaflet-dest-marker',
+    html: `<div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);">
+      <div style="background:#d93025;color:#fff;border-radius:16px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25);border:2px solid #fff;">🏁 Destination</div>
+      <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #d93025;margin-top:-1px;"></div>
+    </div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  });
+}
+
+function createPOIIcon(type) {
+  const isFuel = type === 'FUEL' || type === 'petrol';
+  const emoji = isFuel ? '⛽' : '🏨';
+  const bg = isFuel ? '#e8f0fe' : '#f3e8fd';
+  const border = isFuel ? '#1a73e8' : '#7627bb';
+
+  return L.divIcon({
+    className: 'leaflet-poi-marker',
+    html: `<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;background:${bg};border:2px solid ${border};border-radius:50%;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,0.18);transform:translate(-50%,-50%);">${emoji}</div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  });
+}
+
+
+// ─── Map Camera Controller ────────────────────────────────────
+
+function MapCameraController({ mapFocus, trip, travelers, stops }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!mapFocus) return;
+
+    if (mapFocus.fitGroup) {
+      const points = [];
+      if (trip?.origin_lat) points.push([Number(trip.origin_lat), Number(trip.origin_lng)]);
+      if (trip?.destination_lat) points.push([Number(trip.destination_lat), Number(trip.destination_lng)]);
+      travelers.forEach(t => {
+        if (t.latitude && t.longitude && !t.isSharingOff && t.status !== 'OFFLINE') {
+          points.push([Number(t.latitude), Number(t.longitude)]);
+        }
+      });
+      (stops || []).forEach(st => {
+        if (st?.latitude && st?.longitude) {
+          points.push([Number(st.latitude), Number(st.longitude)]);
+        }
+      });
+      if (points.length > 0) {
+        map.fitBounds(points, { padding: [50, 50], maxZoom: 14 });
+      }
+    } else if (mapFocus.lat && mapFocus.lng) {
+      map.flyTo([Number(mapFocus.lat), Number(mapFocus.lng)], mapFocus.zoom || 14, { duration: 0.8 });
+    }
+  }, [mapFocus, trip, travelers, stops, map]);
+
+  return null;
+}
+
+
+// ─── Route Fetcher (OSRM — free, follows real roads) ─────────
+
+function useOSRMRoute(origin, destination) {
+  const [routeCoords, setRouteCoords] = useState(null);
+
+  useEffect(() => {
+    if (!origin || !destination) return;
+
+    const oLat = Number(origin.lat);
+    const oLng = Number(origin.lng);
+    const dLat = Number(destination.lat);
+    const dLng = Number(destination.lng);
+
+    if (!oLat || !dLat) return;
+
+    // OSRM uses lng,lat format
+    const url = `https://router.project-osrm.org/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson`;
+
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        if (data.code === 'Ok' && data.routes?.[0]?.geometry?.coordinates) {
+          // GeoJSON is [lng, lat] — Leaflet needs [lat, lng]
+          const coords = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+          setRouteCoords(coords);
+        }
+      })
+      .catch(err => {
+        console.warn('[OSRMRoute] Failed to fetch road route:', err);
+      });
+  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng]);
+
+  return routeCoords;
+}
+
+
+// ─── Fallback waypoint polyline (NH44/NH21 Delhi-Manali) ──────
+
+const FALLBACK_ROUTE_WAYPOINTS = [
+  [28.6315, 77.2167], // CP Delhi
+  [28.7365, 77.1510], // Mukarba Chowk
+  [29.0264, 77.0700], // Murthal
+  [29.2330, 77.0120], // Samalkha
+  [29.3909, 76.9635], // Panipat
+  [29.6857, 76.9905], // Karnal
+  [29.9695, 76.8783], // Kurukshetra
+  [30.3782, 76.7767], // Ambala
+  [30.7333, 76.7794], // Chandigarh
+  [31.1812, 76.5684], // Kiratpur
+  [31.3400, 76.7600], // Bilaspur
+  [31.7087, 76.9320], // Mandi
+  [31.9579, 77.1095], // Kullu
+  [32.2396, 77.1887], // Manali
 ];
 
-export function GoogleMapContainer(props = {}) {
-  const rawKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-  const hasValidKeyFormat = Boolean(rawKey && rawKey.trim().length > 10 && !rawKey.startsWith('your_'));
-  
-  const [useVisualizer, setUseVisualizer] = useState(!hasValidKeyFormat);
-  const mapRef = useRef(null);
 
+// ─── Main Component ───────────────────────────────────────────
+
+export function GoogleMapContainer(props = {}) {
   const {
     trip,
     members,
@@ -60,420 +200,332 @@ export function GoogleMapContainer(props = {}) {
   const { user: currentUser } = useAuthStore();
   const travelers = selectTravelers(members, liveLocations, currentUser?.id);
 
-  const { isLoaded, loadError } = useJsApiLoader({
-    googleMapsApiKey: hasValidKeyFormat ? rawKey : '',
-    libraries: hasValidKeyFormat ? libraries : []
-  });
+  // Route endpoints
+  const origin = trip?.origin_lat ? { lat: trip.origin_lat, lng: trip.origin_lng } : null;
+  const destination = trip?.destination_lat ? { lat: trip.destination_lat, lng: trip.destination_lng } : null;
 
-  const centerLat = Number(groupCenter?.latitude) || Number(trip?.origin_lat) || 28.6315;
-  const centerLng = Number(groupCenter?.longitude) || Number(trip?.origin_lng) || 77.2167;
-  const center = { lat: centerLat, lng: centerLng };
+  // Fetch REAL road route geometry from OSRM (free, no key needed)
+  const osrmRoute = useOSRMRoute(origin, destination);
 
-  const onLoad = useCallback((map) => {
-    mapRef.current = map;
-  }, []);
+  // Use OSRM road geometry if available, else use fallback waypoints
+  const routeCoords = osrmRoute || (origin && destination ? FALLBACK_ROUTE_WAYPOINTS : []);
 
-  const onUnmount = useCallback(() => {
-    mapRef.current = null;
-  }, []);
+  // Initial center & zoom
+  const center = useMemo(() => {
+    if (groupCenter?.latitude) return [Number(groupCenter.latitude), Number(groupCenter.longitude)];
+    if (trip?.origin_lat) return [Number(trip.origin_lat), Number(trip.origin_lng)];
+    return [30.0, 77.0]; // Midpoint Delhi-Manali
+  }, [groupCenter?.latitude, groupCenter?.longitude, trip?.origin_lat, trip?.origin_lng]);
 
-  // React to store camera focus changes safely
-  useEffect(() => {
-    if (!mapRef.current || !window.google?.maps || !mapFocus) return;
+  // Fuel and hotel POIs
+  const fuelPOIs = pois.filter(p => p.type === 'FUEL' || p.type === 'petrol');
+  const hotelPOIs = pois.filter(p => p.type === 'HOTEL' || p.type === 'hotel');
 
-    try {
-      if (mapFocus.fitGroup) {
-        const bounds = new window.google.maps.LatLngBounds();
-        let pointCount = 0;
-
-        if (trip?.origin_lat && trip?.origin_lng) {
-          bounds.extend({ lat: Number(trip.origin_lat), lng: Number(trip.origin_lng) });
-          pointCount++;
-        }
-        if (trip?.destination_lat && trip?.destination_lng) {
-          bounds.extend({ lat: Number(trip.destination_lat), lng: Number(trip.destination_lng) });
-          pointCount++;
-        }
-        travelers.forEach((t) => {
-          if (t.latitude && t.longitude && !t.isSharingOff && t.status !== 'OFFLINE') {
-            bounds.extend({ lat: Number(t.latitude), lng: Number(t.longitude) });
-            pointCount++;
-          }
-        });
-        (stops || []).forEach((st) => {
-          if (st && st.latitude && st.longitude) {
-            bounds.extend({ lat: Number(st.latitude), lng: Number(st.longitude) });
-            pointCount++;
-          }
-        });
-
-        if (pointCount > 0 && mapRef.current) {
-          mapRef.current.fitBounds(bounds, 80);
-        }
-      } else if (mapFocus.lat && mapFocus.lng) {
-        mapRef.current.panTo({ lat: Number(mapFocus.lat), lng: Number(mapFocus.lng) });
-        if (mapFocus.zoom) {
-          mapRef.current.setZoom(mapFocus.zoom);
-        }
-      }
-    } catch (err) {
-      console.warn('[GoogleMapContainer] Camera focus warning:', err);
-    }
-  }, [mapFocus, trip, travelers, stops]);
-
-  // Route path coordinates with numbers
-  const routePath = trip?.origin_lat && trip?.destination_lat
-    ? [
-        { lat: Number(trip.origin_lat), lng: Number(trip.origin_lng) },
-        { lat: 29.0264, lng: 77.0700 }, // Murthal
-        { lat: 29.3909, lng: 76.9635 }, // Panipat
-        { lat: 30.3782, lng: 76.7767 }, // Ambala
-        { lat: 31.7087, lng: 76.9320 }, // Mandi
-        { lat: Number(trip.destination_lat), lng: Number(trip.destination_lng) }
-      ]
-    : [];
-
-  // When user requests Canvas Visualizer or when Google Maps is not active
-  if (useVisualizer) {
-    return (
-      <div className="relative w-full h-full">
-        <CanvasMapVisualizer />
-
-        {/* Mode Switcher Pill */}
-        {hasValidKeyFormat && (
-          <div className="absolute top-20 left-4 z-20 flex items-center gap-2">
-            <button
-              onClick={() => setUseVisualizer(false)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-[#202124] text-xs font-bold shadow-md border border-[#dadce0] hover:bg-[#f8f9fa] transition-all"
-            >
-              <MapIcon className="w-3.5 h-3.5 text-[#1a73e8]" />
-              <span>Switch to Google Maps JS</span>
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // If loading Google Maps JS API
-  if (!isLoaded && !loadError) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-[#f8f9fa] text-[#5f6368]">
-        <div className="text-center space-y-3 p-6 bg-white border border-[#dadce0] rounded-3xl shadow-sm max-w-sm">
-          <div className="w-8 h-8 border-3 border-[#1a73e8] border-t-transparent rounded-full animate-spin mx-auto" />
-          <h3 className="text-sm font-bold text-[#202124]">Loading Google Maps Platform...</h3>
-          <p className="text-xs text-[#5f6368]">Initializing Maps JavaScript API SDK</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If Google Maps JS API failed to load or has invalid key
-  if (loadError || !hasValidKeyFormat) {
-    return (
-      <div className="relative w-full h-full">
-        {/* Render Canvas Visualizer so map is functional */}
-        <CanvasMapVisualizer pois={pois} />
-
-        {/* Honest, Clear Google Maps Status Alert */}
-        <div className="absolute top-20 left-4 right-4 sm:right-auto sm:max-w-md z-20 bg-white/95 backdrop-blur-md p-4 rounded-3xl border border-[#dadce0] shadow-xl space-y-2.5">
-          <div className="flex items-start gap-2.5">
-            <div className="p-2 rounded-full bg-[#fef7e0] text-[#b06000] shrink-0 mt-0.5">
-              <Key className="w-4 h-4" />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-[#202124]">Google Maps JS Platform Notice</h4>
-              <p className="text-[11px] text-[#5f6368] leading-relaxed mt-0.5">
-                Google Maps JavaScript API requires an authorized Google Cloud API key (<code className="text-[#1a73e8] font-mono">AIzaSy...</code>) with Maps JS API enabled.
-              </p>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-[#f1f3f4] flex items-center justify-between gap-2">
-            <span className="text-[10px] text-[#137333] font-semibold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#1e8e3e]" /> Live Vector Cartography Active
-            </span>
-            <button
-              onClick={() => setUseVisualizer(true)}
-              className="px-3 py-1 rounded-full bg-[#f8f9fa] hover:bg-[#f1f3f4] text-[#3c4043] border border-[#dadce0] text-xs font-bold transition-colors"
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // REAL GOOGLE MAPS RENDERER
   return (
     <div className="relative w-full h-full">
-      <GoogleMap
-        mapContainerStyle={{ width: '100%', height: '100%' }}
+      <MapContainer
         center={center}
-        zoom={9}
-        onLoad={onLoad}
-        onUnmount={onUnmount}
-        options={{
-          styles: googleMapsLightStyle,
-          disableDefaultUI: true,
-          zoomControl: false,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: false
-        }}
+        zoom={7}
+        style={{ width: '100%', height: '100%' }}
+        zoomControl={false}
+        attributionControl={false}
       >
-        {/* Route Polyline Layer */}
-        {layerVisibility?.route && routePath.length > 0 && (
+        {/* Real OpenStreetMap Tiles — real roads, real geography, real labels */}
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          maxZoom={19}
+        />
+
+        {/* Map camera controller (responds to store mapFocus changes) */}
+        <MapCameraController
+          mapFocus={mapFocus}
+          trip={trip}
+          travelers={travelers}
+          stops={stops}
+        />
+
+        {/* ─── ROUTE LAYER ─── */}
+        {layerVisibility?.route && routeCoords.length > 0 && (
           <>
+            {/* Glow/shadow layer */}
             <Polyline
-              path={routePath}
-              options={{
-                strokeColor: '#8ab4f8',
-                strokeOpacity: 0.7,
-                strokeWeight: 7
+              positions={routeCoords}
+              pathOptions={{
+                color: '#4285f4',
+                weight: 8,
+                opacity: 0.3,
+                lineCap: 'round',
+                lineJoin: 'round',
               }}
             />
+            {/* Main route line */}
             <Polyline
-              path={routePath}
-              options={{
-                strokeColor: '#1a73e8',
-                strokeOpacity: 1,
-                strokeWeight: 4
+              positions={routeCoords}
+              pathOptions={{
+                color: '#1a73e8',
+                weight: 5,
+                opacity: 0.85,
+                lineCap: 'round',
+                lineJoin: 'round',
               }}
             />
           </>
         )}
 
-        {/* Origin Marker */}
-        {trip?.origin_lat && (
+        {/* ─── ORIGIN MARKER ─── */}
+        {origin && (
           <Marker
-            position={{ lat: Number(trip.origin_lat), lng: Number(trip.origin_lng) }}
-            label={{ text: '🟢 Origin', color: '#137333', fontWeight: 'bold', fontSize: '10px' }}
-          />
+            position={[Number(origin.lat), Number(origin.lng)]}
+            icon={createOriginIcon()}
+          >
+            <Popup>
+              <div style={{ fontFamily: 'system-ui', fontSize: '13px' }}>
+                <strong>🟢 Origin</strong><br/>
+                {trip?.origin || 'Connaught Place, New Delhi'}
+              </div>
+            </Popup>
+          </Marker>
         )}
 
-        {/* Destination Marker */}
-        {trip?.destination_lat && (
+        {/* ─── DESTINATION MARKER ─── */}
+        {destination && (
           <Marker
-            position={{ lat: Number(trip.destination_lat), lng: Number(trip.destination_lng) }}
-            label={{ text: '🏁 Destination', color: '#d93025', fontWeight: 'bold', fontSize: '10px' }}
-          />
+            position={[Number(destination.lat), Number(destination.lng)]}
+            icon={createDestinationIcon()}
+          >
+            <Popup>
+              <div style={{ fontFamily: 'system-ui', fontSize: '13px' }}>
+                <strong>🏁 Destination</strong><br/>
+                {trip?.destination || 'Mall Road, Manali'}
+              </div>
+            </Popup>
+          </Marker>
         )}
 
-        {/* Group Centroid Marker */}
-        {groupCenter && groupCenter.latitude && (
-          <Marker
-            position={{ lat: Number(groupCenter.latitude), lng: Number(groupCenter.longitude) }}
-            title="Group Centroid Hub"
-          />
-        )}
-
-        {/* Stop Markers */}
-        {layerVisibility?.stops && (stops || []).map((stop) => (
-          <Marker
-            key={stop.id}
-            position={{ lat: Number(stop.latitude), lng: Number(stop.longitude) }}
-            onClick={() => setSelectedStop(stop)}
-            title={`Stop: ${stop.location_name || 'Rest Point'}`}
-          />
-        ))}
-
-        {/* POI Markers: Petrol Stations ⛽ */}
-        {layerVisibility?.petrol && (pois || []).filter(p => p.type === 'petrol').map((poi) => (
-          <Marker
-            key={poi.id}
-            position={{ lat: Number(poi.latitude), lng: Number(poi.longitude) }}
-            onClick={() => setSelectedPOI(poi)}
-            title={`⛽ ${poi.name}`}
-          />
-        ))}
-
-        {/* POI Markers: Hotels 🏨 */}
-        {layerVisibility?.hotels && (pois || []).filter(p => p.type === 'hotel').map((poi) => (
-          <Marker
-            key={poi.id}
-            position={{ lat: Number(poi.latitude), lng: Number(poi.longitude) }}
-            onClick={() => setSelectedPOI(poi)}
-            title={`🏨 ${poi.name}`}
-          />
-        ))}
-
-        {/* Member Markers & Split Connectors (Every active reporting traveler) */}
-        {layerVisibility?.members && travelers.map((t) => {
+        {/* ─── TRAVELER MARKERS ─── */}
+        {layerVisibility?.members && travelers.map(t => {
           if (!t.latitude || !t.longitude || t.isSharingOff || t.status === 'OFFLINE') return null;
-          const isSelected = selectedMemberId === t.id;
           const isStopped = t.status === 'STOPPED' || t.status === 'POSSIBLE_STOP';
           const isSplit = t.status === 'SPLIT' || t.status === 'FALLING_BEHIND';
-          const isLeader = t.isLeader;
           const isArrived = t.status === 'ARRIVED';
 
           return (
-            <React.Fragment key={t.id}>
-              {/* Split connector line to group center */}
-              {isSplit && groupCenter && groupCenter.latitude && (
-                <Polyline
-                  path={[
-                    { lat: Number(groupCenter.latitude), lng: Number(groupCenter.longitude) },
-                    { lat: Number(t.latitude), lng: Number(t.longitude) }
-                  ]}
-                  options={{
-                    strokeColor: '#f9ab00',
-                    strokeOpacity: 0.9,
-                    strokeWeight: 2.5
-                  }}
-                />
-              )}
-
-              <Marker
-                position={{ lat: Number(t.latitude), lng: Number(t.longitude) }}
-                onClick={() => setSelectedMemberId(isSelected ? null : t.id)}
-                title={`${isLeader ? '👑 LEADER: ' : ''}${t.name} (${isArrived ? 'Arrived' : t.status})`}
-              />
-            </React.Fragment>
+            <Marker
+              key={t.id}
+              position={[Number(t.latitude), Number(t.longitude)]}
+              icon={createTravelerIcon(t)}
+              eventHandlers={{
+                click: () => setSelectedMemberId(selectedMemberId === t.id ? null : t.id),
+              }}
+            >
+              <Popup>
+                <div style={{ fontFamily: 'system-ui', fontSize: '12px', minWidth: '160px' }}>
+                  <div style={{ fontWeight: 700, fontSize: '13px', marginBottom: '4px' }}>
+                    {t.isLeader ? '👑 ' : ''}{t.name}{t.isMe ? ' (You)' : ''}
+                  </div>
+                  <div style={{ color: '#5f6368', marginBottom: '2px' }}>
+                    📍 {t.locationName || 'En route'}
+                  </div>
+                  <div style={{ marginBottom: '2px' }}>
+                    <strong>Status:</strong>{' '}
+                    {isArrived ? '✓ Arrived' : isStopped ? '🛑 Stopped' : isSplit ? '⚠ Behind' : '🟢 Moving'}
+                  </div>
+                  <div style={{ marginBottom: '2px' }}>
+                    <strong>Speed:</strong> {isArrived || isStopped ? '0' : Math.round(t.speed || 0)} km/h
+                  </div>
+                  <div style={{ marginBottom: '2px' }}>
+                    <strong>Position:</strong> {t.relativePositionText || 'With group'}
+                  </div>
+                  {t.eta && <div><strong>ETA:</strong> {t.eta}</div>}
+                  {isStopped && t.stoppedLocationName && (
+                    <div style={{ marginTop: '4px', padding: '4px 6px', background: '#fce8e6', borderRadius: '8px', color: '#c5221f', fontSize: '11px' }}>
+                      🛑 {t.stoppedLocationName}
+                      {t.stopDurationText ? ` · ${t.stopDurationText}` : ''}
+                      {t.isLongStop ? ' ⚠ 10+ min' : ''}
+                    </div>
+                  )}
+                  {isStopped && t.nearbyPetrol && (
+                    <div style={{ marginTop: '2px', fontSize: '11px', color: '#202124' }}>
+                      ⛽ Near: {t.nearbyPetrol.name}
+                    </div>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
           );
         })}
-      </GoogleMap>
 
-      {/* Switch to Vector Visualizer Button */}
-      <button
-        onClick={() => setUseVisualizer(true)}
-        className="absolute top-20 left-4 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md text-[#202124] text-xs font-bold shadow-md border border-[#dadce0] hover:bg-[#f8f9fa] transition-all"
-      >
-        <Layers className="w-3.5 h-3.5 text-[#1a73e8]" />
-        <span>Switch to Vector Visualizer</span>
-      </button>
+        {/* ─── SPLIT CONNECTOR LINES ─── */}
+        {layerVisibility?.members && travelers.map(t => {
+          if (!t.latitude || !t.longitude) return null;
+          const isSplit = t.status === 'SPLIT' || t.status === 'FALLING_BEHIND';
+          if (!isSplit || !groupCenter?.latitude) return null;
 
-      {/* PROGRESSIVE DISCLOSURE: FLOATING SELECTED TRAVELER CARD */}
+          return (
+            <Polyline
+              key={`split-${t.id}`}
+              positions={[
+                [Number(groupCenter.latitude), Number(groupCenter.longitude)],
+                [Number(t.latitude), Number(t.longitude)]
+              ]}
+              pathOptions={{
+                color: '#f9ab00',
+                weight: 2,
+                opacity: 0.8,
+                dashArray: '8, 6',
+              }}
+            />
+          );
+        })}
+
+        {/* ─── STOP MARKERS ─── */}
+        {layerVisibility?.stops && (stops || []).map(stop => (
+          <Marker
+            key={stop.id}
+            position={[Number(stop.latitude), Number(stop.longitude)]}
+            eventHandlers={{ click: () => setSelectedStop(stop) }}
+          >
+            <Popup>
+              <div style={{ fontFamily: 'system-ui', fontSize: '12px' }}>
+                <strong>🛑 Stop</strong><br/>
+                {stop.location_name || 'Rest Point'}
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+        {/* ─── FUEL POI MARKERS ─── */}
+        {layerVisibility?.petrol && fuelPOIs.map(poi => (
+          <Marker
+            key={poi.id}
+            position={[Number(poi.latitude), Number(poi.longitude)]}
+            icon={createPOIIcon('FUEL')}
+            eventHandlers={{ click: () => setSelectedPOI(poi) }}
+          >
+            <Popup>
+              <div style={{ fontFamily: 'system-ui', fontSize: '12px' }}>
+                <strong>⛽ {poi.name}</strong><br/>
+                <span style={{ color: '#5f6368' }}>{poi.address || 'Along route'}</span>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+
+        {/* ─── HOTEL POI MARKERS ─── */}
+        {layerVisibility?.hotels && hotelPOIs.map(poi => (
+          <Marker
+            key={poi.id}
+            position={[Number(poi.latitude), Number(poi.longitude)]}
+            icon={createPOIIcon('HOTEL')}
+            eventHandlers={{ click: () => setSelectedPOI(poi) }}
+          >
+            <Popup>
+              <div style={{ fontFamily: 'system-ui', fontSize: '12px' }}>
+                <strong>🏨 {poi.name}</strong><br/>
+                <span style={{ color: '#5f6368' }}>{poi.address || 'Along route'}</span>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
+
+      {/* ─── FLOATING SELECTED TRAVELER CARD ─── */}
       {selectedMemberId && (() => {
         const sel = travelers.find(t => t.id === selectedMemberId);
         if (!sel) return null;
-
         const isStopped = sel.status === 'STOPPED' || sel.status === 'POSSIBLE_STOP';
         const isSplit = sel.status === 'SPLIT' || sel.status === 'FALLING_BEHIND';
         const isArrived = sel.status === 'ARRIVED';
-        const isLeader = sel.isLeader;
 
         return (
-          <div className="absolute bottom-22 sm:bottom-6 left-3 sm:left-4 z-40 max-w-[calc(100vw-24px)] sm:max-w-xs w-full bg-white/95 backdrop-blur-md border border-[#dadce0] p-3 rounded-3xl shadow-xl space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-auto text-xs">
+          <div className="absolute bottom-22 sm:bottom-6 left-3 sm:left-4 z-[1000] max-w-[calc(100vw-24px)] sm:max-w-xs w-full bg-white/95 backdrop-blur-md border border-[#dadce0] p-3 rounded-2xl shadow-xl space-y-2 pointer-events-auto text-xs">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
-                <img
-                  src={sel.profile_image}
-                  alt={sel.name}
-                  className="w-9 h-9 rounded-full bg-[#f1f3f4] border border-[#dadce0] object-cover"
-                />
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold ${sel.isLeader ? 'bg-[#1a73e8]' : isStopped ? 'bg-[#d93025]' : isSplit ? 'bg-[#f9ab00]' : isArrived ? 'bg-[#7627bb]' : 'bg-[#1e8e3e]'}`}>
+                  {sel.name?.[0] || '?'}
+                </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <h4 className="text-xs font-bold text-[#202124] truncate">{sel.name}</h4>
-                    {isLeader && (
-                      <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-[#fef7e0] text-[#b06000] border border-[#feefc3]">
-                        👑 LEADER
-                      </span>
+                    {sel.isLeader && (
+                      <span className="text-[9px] font-extrabold px-1.5 rounded-full bg-[#fef7e0] text-[#b06000] border border-[#feefc3]">👑 LEADER</span>
                     )}
                     {sel.isMe && (
-                      <span className="text-[8px] font-extrabold uppercase px-1.5 py-0.2 rounded-full bg-[#1a73e8] text-white">
-                        YOU
-                      </span>
+                      <span className="text-[8px] font-extrabold uppercase px-1.5 rounded-full bg-[#1a73e8] text-white">YOU</span>
                     )}
                   </div>
-                  <p className="text-[11px] text-[#5f6368] truncate font-medium">
-                    {sel.locationName}
-                  </p>
+                  <p className="text-[11px] text-[#5f6368] truncate font-medium">{sel.locationName}</p>
                 </div>
               </div>
-
-              <button
-                onClick={() => setSelectedMemberId(null)}
-                className="p-1 text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] rounded-full text-xs font-bold"
-              >
-                ✕
-              </button>
+              <button onClick={() => setSelectedMemberId(null)} className="p-1 text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] rounded-full text-xs font-bold">✕</button>
             </div>
 
-            {/* Status & Metrics Bar */}
-            <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-[#f1f3f4] text-xs">
+            <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-[#f1f3f4] text-xs">
               <div className="bg-[#f8f9fa] p-1.5 rounded-xl border border-[#dadce0] text-center">
                 <span className="text-[9px] text-[#5f6368] block font-medium">Status</span>
                 <span className={`font-bold text-[11px] ${isArrived ? 'text-[#137333]' : isStopped ? 'text-[#d93025]' : isSplit ? 'text-[#b06000]' : 'text-[#137333]'}`}>
-                  {isArrived ? '✓ Arrived' : isStopped ? '🛑 Stopped' : isSplit ? '⚠ Behind' : '🟢 Moving'}
+                  {isArrived ? '✓ Arrived' : isStopped ? 'Stopped' : isSplit ? 'Behind' : 'Moving'}
                 </span>
               </div>
               <div className="bg-[#f8f9fa] p-1.5 rounded-xl border border-[#dadce0] text-center">
                 <span className="text-[9px] text-[#5f6368] block font-medium">Speed</span>
-                <span className="font-mono font-bold text-[11px] text-[#202124]">
-                  {isArrived || isStopped ? '0 km/h' : sel.speed !== null ? `${Math.round(sel.speed)} km/h` : '--'}
+                <span className="font-mono font-bold text-[11px] text-[#202124]">{isArrived || isStopped ? '0' : Math.round(sel.speed || 0)} km/h</span>
+              </div>
+              <div className="bg-[#f8f9fa] p-1.5 rounded-xl border border-[#dadce0] text-center">
+                <span className="text-[9px] text-[#5f6368] block font-medium">Position</span>
+                <span className="font-bold text-[10px] text-[#202124] leading-tight block truncate" title={sel.relativePositionText}>
+                  {sel.relativePositionText || 'With group'}
                 </span>
               </div>
             </div>
 
-            {/* Additional Context Banners */}
-            {isArrived && (
-              <p className="text-[11px] text-[#137333] font-semibold bg-[#e6f4ea] px-2.5 py-1 rounded-xl border border-[#ceead6]">
-                Reached destination {sel.arrivedAtTimeText ? `at ${sel.arrivedAtTimeText}` : ''}
-              </p>
-            )}
             {isStopped && (
               <div className="space-y-1">
                 <p className="text-[11px] text-[#c5221f] font-semibold bg-[#fce8e6] px-2.5 py-1 rounded-xl">
-                  Stopped for {sel.stopDurationText || '0 min'} {sel.isLongStop ? '⚠ (Stationary 10+ min)' : ''}
+                  🛑 Stopped for {sel.stopDurationText || '0 min'} {sel.isLongStop ? '⚠ (10+ min)' : ''}
                 </p>
                 {sel.nearbyPetrol && (
                   <p className="text-[10px] text-[#202124] bg-[#f8f9fa] px-2 py-0.5 rounded-lg border border-[#dadce0]">
-                    ⛽ Petrol nearby: <span className="font-semibold">{sel.nearbyPetrol.name} ({sel.nearbyPetrol.distanceText})</span>
+                    ⛽ {sel.nearbyPetrol.name} ({sel.nearbyPetrol.distanceText})
                   </p>
                 )}
                 {sel.nearbyHotel && (
                   <p className="text-[10px] text-[#202124] bg-[#f8f9fa] px-2 py-0.5 rounded-lg border border-[#dadce0]">
-                    🏨 Hotel nearby: <span className="font-semibold">{sel.nearbyHotel.name} ({sel.nearbyHotel.distanceText})</span>
+                    🏨 {sel.nearbyHotel.name} ({sel.nearbyHotel.distanceText})
                   </p>
                 )}
               </div>
             )}
             {isSplit && (
               <p className="text-[11px] text-[#b06000] font-semibold bg-[#fef7e0] px-2.5 py-1 rounded-xl">
-                {sel.distanceFromGroupKm ? `${sel.distanceFromGroupKm} km behind convoy` : 'Falling behind convoy'}
+                {sel.distanceFromGroupKm ? `⚠ ${sel.distanceFromGroupKm} km behind convoy` : '⚠ Falling behind convoy'}
+              </p>
+            )}
+            {isArrived && (
+              <p className="text-[11px] text-[#137333] font-semibold bg-[#e6f4ea] px-2.5 py-1 rounded-xl">
+                ✓ Reached destination {sel.arrivedAtTimeText ? `at ${sel.arrivedAtTimeText}` : ''}
               </p>
             )}
           </div>
         );
       })()}
 
-      {/* PROGRESSIVE DISCLOSURE: FLOATING SELECTED POI CARD (Bottom-Left) */}
+      {/* ─── FLOATING SELECTED POI CARD ─── */}
       {selectedPOI && (
-        <div className="absolute bottom-22 sm:bottom-6 left-3 sm:left-4 z-40 max-w-[calc(100vw-24px)] sm:max-w-xs w-full bg-white/95 backdrop-blur-md border border-[#dadce0] p-3 rounded-3xl shadow-xl space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-auto text-xs">
+        <div className="absolute bottom-22 sm:bottom-6 left-3 sm:left-4 z-[1000] max-w-[calc(100vw-24px)] sm:max-w-xs w-full bg-white/95 backdrop-blur-md border border-[#dadce0] p-3 rounded-2xl shadow-xl space-y-2 pointer-events-auto text-xs">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-2xl bg-[#e8f0fe] border border-[#d2e3fc] flex items-center justify-center text-base shrink-0">
-                {selectedPOI.icon || (selectedPOI.type === 'petrol' ? '⛽' : '🏨')}
+                {selectedPOI.type === 'FUEL' || selectedPOI.type === 'petrol' ? '⛽' : '🏨'}
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <h4 className="text-xs font-bold text-[#202124] truncate">{selectedPOI.name}</h4>
-                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-[#f1f3f4] text-[#5f6368]">
-                    {selectedPOI.categoryText || (selectedPOI.type === 'petrol' ? 'Petrol Station' : 'Hotel')}
-                  </span>
-                </div>
-                <p className="text-[11px] text-[#5f6368] truncate font-medium">
-                  {selectedPOI.address || 'Along Highway Route'}
-                </p>
+                <h4 className="text-xs font-bold text-[#202124] truncate">{selectedPOI.name}</h4>
+                <p className="text-[11px] text-[#5f6368] truncate font-medium">{selectedPOI.address || 'Along route corridor'}</p>
               </div>
             </div>
-
-            <button
-              onClick={() => setSelectedPOI(null)}
-              className="p-1 text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] rounded-full text-xs font-bold"
-            >
-              ✕
-            </button>
+            <button onClick={() => setSelectedPOI(null)} className="p-1 text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] rounded-full text-xs font-bold">✕</button>
           </div>
-
-          {selectedPOI.distanceText && (
-            <div className="pt-1 border-t border-[#f1f3f4] flex items-center justify-between text-xs">
-              <span className="text-[#5f6368] font-medium text-[11px]">Distance from route:</span>
-              <span className="font-bold text-[#1a73e8] font-mono text-[11px]">{selectedPOI.distanceText}</span>
-            </div>
-          )}
         </div>
       )}
     </div>

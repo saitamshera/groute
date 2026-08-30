@@ -178,8 +178,11 @@ export function setupSockets(io) {
       });
 
       // Update redis status
-      const existing = await redisStore.hget(`trip:${tripId}:locations`, user.id);
-      if (existing) {
+      let existing = await redisStore.hget(`trip:${tripId}:locations`, user.id);
+      if (typeof existing === 'string') {
+        try { existing = JSON.parse(existing); } catch (e) { existing = null; }
+      }
+      if (existing && typeof existing === 'object') {
         existing.locationSharing = true;
         await redisStore.hset(`trip:${tripId}:locations`, user.id, existing);
       }
@@ -201,8 +204,11 @@ export function setupSockets(io) {
       });
 
       // Update redis status
-      const existing = await redisStore.hget(`trip:${tripId}:locations`, user.id);
-      if (existing) {
+      let existing = await redisStore.hget(`trip:${tripId}:locations`, user.id);
+      if (typeof existing === 'string') {
+        try { existing = JSON.parse(existing); } catch (e) { existing = null; }
+      }
+      if (existing && typeof existing === 'object') {
         existing.locationSharing = false;
         existing.status = 'LOCATION_OFF';
         await redisStore.hset(`trip:${tripId}:locations`, user.id, existing);

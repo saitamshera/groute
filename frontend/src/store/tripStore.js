@@ -161,6 +161,7 @@ export function selectTravelers(members = [], liveLocations = {}, currentUserId 
   const activeTraveling = rawTravelers.filter(t => t.status !== 'ARRIVED' && t.latitude && t.longitude && !t.isSharingOff);
   let leaderId = null;
   let maxProgress = -1;
+  let leaderTravelerObj = null;
 
   if (activeTraveling.length > 0) {
     for (const t of activeTraveling) {
@@ -168,6 +169,7 @@ export function selectTravelers(members = [], liveLocations = {}, currentUserId 
       if (prog > maxProgress) {
         maxProgress = prog;
         leaderId = t.id;
+        leaderTravelerObj = t;
       }
     }
   }
@@ -180,10 +182,41 @@ export function selectTravelers(members = [], liveLocations = {}, currentUserId 
     else if (t.status === 'SPLIT' || t.status === 'FALLING_BEHIND') convoyRole = 'BEHIND';
     else if (t.status === 'STOPPED' || t.status === 'POSSIBLE_STOP') convoyRole = 'STOPPED';
 
+    // Calculate relative distance and human-readable position statement
+    let distanceFromLeaderKm = null;
+    let relativePositionText = 'With group';
+
+    if (isLeader) {
+      relativePositionText = 'Leader';
+    } else if (t.status === 'ARRIVED') {
+      relativePositionText = 'Arrived';
+    } else if (t.status === 'STOPPED' || t.status === 'POSSIBLE_STOP') {
+      relativePositionText = 'Stopped';
+    } else if (leaderTravelerObj && leaderTravelerObj.distanceToDestinationKm !== null && t.distanceToDestinationKm !== null) {
+      const diff = Math.round((t.distanceToDestinationKm - leaderTravelerObj.distanceToDestinationKm) * 10) / 10;
+      if (diff > 0.3) {
+        distanceFromLeaderKm = diff;
+        relativePositionText = `${diff} km behind leader`;
+      } else if (diff < -0.3) {
+        distanceFromLeaderKm = diff;
+        relativePositionText = `${Math.abs(diff)} km ahead of convoy`;
+      } else {
+        relativePositionText = 'With group';
+      }
+    } else if (t.distanceFromGroupKm !== null) {
+      if (t.distanceFromGroupKm > 2) {
+        relativePositionText = `${t.distanceFromGroupKm} km behind leader`;
+      } else {
+        relativePositionText = 'With group';
+      }
+    }
+
     return {
       ...t,
       isLeader,
-      convoyRole
+      convoyRole,
+      distanceFromLeaderKm,
+      relativePositionText
     };
   });
 

@@ -95,7 +95,7 @@ function runRegressionSuite() {
     for (const p of corridorPOIs) {
       assert(typeof p.id === 'string', 'POI id must be string');
       assert(typeof p.name === 'string', 'POI name must be string');
-      assert(p.type === 'petrol' || p.type === 'hotel', 'POI type must be petrol or hotel');
+      assert(p.type === 'petrol' || p.type === 'hotel' || p.type === 'FUEL' || p.type === 'HOTEL', 'POI type must be petrol/FUEL or hotel/HOTEL');
       assert(typeof p.latitude === 'number', 'POI latitude must be number');
       assert(typeof p.longitude === 'number', 'POI longitude must be number');
     }
