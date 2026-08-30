@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) || 'http://localhost:5000';
 
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem('grouproute_token');
@@ -45,6 +45,7 @@ export const api = {
   endTrip: (tripId) => request(`/api/trips/${tripId}/end`, { method: 'POST' }),
   getTripTimeline: (tripId) => request(`/api/trips/${tripId}/timeline`),
   getTripStops: (tripId) => request(`/api/trips/${tripId}/stops`),
+  getTripPOIs: (tripId) => request(`/api/trips/${tripId}/pois`),
   getTripLocations: (tripId) => request(`/api/trips/${tripId}/locations`),
   getTripHistory: (tripId) => request(`/api/trips/${tripId}/location-history`),
 

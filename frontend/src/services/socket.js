@@ -1,15 +1,17 @@
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const SOCKET_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_SOCKET_URL) || 'http://localhost:5000';
 
 let socketInstance = null;
 
 export function getSocket() {
   if (!socketInstance) {
-    const token = localStorage.getItem('grouproute_token');
-    
     socketInstance = io(SOCKET_URL, {
-      auth: { token },
+      auth: (cb) => {
+        const token = localStorage.getItem('grouproute_token');
+        cb({ token });
+      },
+      transports: ['websocket', 'polling'],
       autoConnect: false,
       reconnection: true,
       reconnectionAttempts: Infinity,
@@ -30,6 +32,12 @@ export function getSocket() {
       console.warn('[Socket] Connection error:', err.message);
     });
   }
+
+  const currentToken = localStorage.getItem('grouproute_token');
+  if (currentToken && socketInstance) {
+    socketInstance.auth = { token: currentToken };
+  }
+
   return socketInstance;
 }
 

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Play, Pause, RotateCcw, Sliders, Sparkles, ChevronUp, ChevronDown } from 'lucide-react';
 import { getSocket } from '../../services/socket.js';
 import useTripStore from '../../store/tripStore.js';
+import useAuthStore from '../../store/authStore.js';
 
 // Route waypoints from Delhi to Manali along NH44 / NH21
 const routeWaypoints = [
@@ -26,23 +27,63 @@ const routeWaypoints = [
   { lat: 32.2396, lng: 77.1887, name: 'Manali Mall Road' }
 ];
 
+const defaultCohorts = [
+  { key: 'leader', name: 'Rahul (Convoy Leader)', offset: 0, baseSpeed: 55, seed: 'Rahul' },
+  { key: 'aman', name: 'Aman', offset: -0.015, baseSpeed: 50, seed: 'Aman' },
+  { key: 'priya', name: 'Priya', offset: -0.005, baseSpeed: 52, seed: 'Priya' },
+  { key: 'karan', name: 'Karan', offset: -0.060, baseSpeed: 45, seed: 'Karan' },
+  { key: 'neha', name: 'Neha (Scout)', offset: 0.025, baseSpeed: 60, seed: 'Neha' },
+];
+
 export function DemoController() {
   const { trip, isSimulationActive, setSimulationActive } = useTripStore();
+  const { user: currentUser } = useAuthStore();
   const [speedMultiplier, setSpeedMultiplier] = useState(2); // 1x, 2x, 5x, 10x
   const [stepIndex, setStepIndex] = useState(0);
   const [simAmanStopped, setSimAmanStopped] = useState(false);
+  const [simAmanLongStop, setSimAmanLongStop] = useState(false);
   const [simKaranSplit, setSimKaranSplit] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [simRahulArrived, setSimRahulArrived] = useState(false);
+  const [simAllArrived, setSimAllArrived] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(true); // Minimized by default
   const timerRef = useRef(null);
 
-  // Simulated traveler profiles
-  const simulatedMembers = [
-    { id: 'sim-rahul', name: 'Rahul (Convoy Leader)', offset: 0, baseSpeed: 55, img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Rahul' },
-    { id: 'sim-aman', name: 'Aman', offset: -0.015, baseSpeed: 50, img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Aman' },
-    { id: 'sim-priya', name: 'Priya', offset: -0.005, baseSpeed: 52, img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Priya' },
-    { id: 'sim-karan', name: 'Karan', offset: -0.060, baseSpeed: 45, img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Karan' },
-    { id: 'sim-neha', name: 'Neha (Scout)', offset: 0.025, baseSpeed: 60, img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Neha' },
-  ];
+  // Dynamically map cohorts to prevent generating a second instance of the logged-in user
+  const simulatedMembers = useMemo(() => {
+    const userNameLower = (currentUser?.name || '').toLowerCase();
+    let matchedKey = null;
+
+    if (userNameLower.includes('aman')) matchedKey = 'aman';
+    else if (userNameLower.includes('rahul')) matchedKey = 'leader';
+    else if (userNameLower.includes('priya')) matchedKey = 'priya';
+    else if (userNameLower.includes('karan')) matchedKey = 'karan';
+    else if (userNameLower.includes('neha')) matchedKey = 'neha';
+    else if (currentUser) matchedKey = 'leader';
+
+    return defaultCohorts.map((cohort) => {
+      if (cohort.key === matchedKey && currentUser) {
+        return {
+          id: currentUser.id,
+          key: cohort.key,
+          name: currentUser.name || cohort.name,
+          offset: cohort.offset,
+          baseSpeed: cohort.baseSpeed,
+          img: currentUser.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.name}`,
+          isCurrentUser: true
+        };
+      }
+
+      return {
+        id: `sim-${cohort.key}`,
+        key: cohort.key,
+        name: cohort.name,
+        offset: cohort.offset,
+        baseSpeed: cohort.baseSpeed,
+        img: `https://api.dicebear.com/7.x/avataaars/svg?seed=${cohort.seed}`,
+        isCurrentUser: false
+      };
+    });
+  }, [currentUser?.id, currentUser?.name]);
 
   // Helper interpolation between waypoints
   const getSimCoords = (index, offset = 0) => {
@@ -61,7 +102,14 @@ export function DemoController() {
     return { lat, lng };
   };
 
-  const emitSimulatedStep = (currentStep, forceAmanStop = simAmanStopped, forceKaranSplit = simKaranSplit) => {
+  const emitSimulatedStep = (
+    currentStep,
+    forceAmanStop = simAmanStopped,
+    forceAmanLong = simAmanLongStop,
+    forceKaranSplit = simKaranSplit,
+    forceRahulArrived = simRahulArrived,
+    forceAllArrived = simAllArrived
+  ) => {
     if (!trip) return;
     const socket = getSocket();
 
@@ -69,14 +117,53 @@ export function DemoController() {
       let speed = member.baseSpeed + (Math.random() * 6 - 3);
       let offset = member.offset;
 
-      // Special Scenario: Aman stopped at Murthal (near step 20)
-      if (member.id === 'sim-aman') {
-        if (forceAmanStop) {
-          speed = 0; // Stationary
+      // Special Scenario: ALL TRAVELERS ARRIVED AT MANALI
+      if (forceAllArrived) {
+        const dest = routeWaypoints[routeWaypoints.length - 1];
+        socket.emit('location:update', {
+          tripId: trip.id,
+          isSimulated: !member.isCurrentUser,
+          simulatedUserId: member.id,
+          simulatedUserName: member.name,
+          simulatedUserImage: member.img,
+          latitude: dest.lat + (Math.random() * 0.002 - 0.001),
+          longitude: dest.lng + (Math.random() * 0.002 - 0.001),
+          accuracy: 5,
+          speed: 0,
+          heading: 0,
+          timestamp: Date.now()
+        });
+        return;
+      }
+
+      // Special Scenario: RAHUL ARRIVED AT MANALI
+      if (member.key === 'leader' && forceRahulArrived) {
+        const dest = routeWaypoints[routeWaypoints.length - 1];
+        socket.emit('location:update', {
+          tripId: trip.id,
+          isSimulated: !member.isCurrentUser,
+          simulatedUserId: member.id,
+          simulatedUserName: member.name,
+          simulatedUserImage: member.img,
+          latitude: dest.lat,
+          longitude: dest.lng,
+          accuracy: 5,
+          speed: 0,
+          heading: 0,
+          timestamp: Date.now()
+        });
+        return;
+      }
+
+      // Special Scenario: Aman stopped / 10-min long stop at Murthal
+      if (member.key === 'aman') {
+        if (forceAmanLong || forceAmanStop) {
           const murthal = routeWaypoints[2];
+          // If long stop, backdate timestamp by 11 minutes (660s) to trigger 10-min long stop alert
+          const simulatedTimestamp = forceAmanLong ? Date.now() - 660000 : Date.now();
           socket.emit('location:update', {
             tripId: trip.id,
-            isSimulated: true,
+            isSimulated: !member.isCurrentUser,
             simulatedUserId: member.id,
             simulatedUserName: member.name,
             simulatedUserImage: member.img,
@@ -85,14 +172,14 @@ export function DemoController() {
             accuracy: 5,
             speed: 0,
             heading: 0,
-            timestamp: Date.now()
+            timestamp: simulatedTimestamp
           });
           return;
         }
       }
 
       // Special Scenario: Karan falling 7.8 km behind convoy
-      if (member.id === 'sim-karan') {
+      if (member.key === 'karan') {
         if (forceKaranSplit) {
           offset = -0.15; // 8+ km behind
           speed = 25;
@@ -106,7 +193,7 @@ export function DemoController() {
 
       socket.emit('location:update', {
         tripId: trip.id,
-        isSimulated: true,
+        isSimulated: !member.isCurrentUser,
         simulatedUserId: member.id,
         simulatedUserName: member.name,
         simulatedUserImage: member.img,
@@ -142,7 +229,7 @@ export function DemoController() {
         clearInterval(timerRef.current);
       }
     };
-  }, [isSimulationActive, speedMultiplier, simAmanStopped, simKaranSplit, trip?.id]);
+  }, [isSimulationActive, speedMultiplier, simAmanStopped, simAmanLongStop, simKaranSplit, simRahulArrived, simAllArrived, trip?.id, simulatedMembers]);
 
   const handleTogglePlay = () => {
     const nextState = !isSimulationActive;
@@ -156,63 +243,94 @@ export function DemoController() {
     setSimulationActive(false);
     setStepIndex(0);
     setSimAmanStopped(false);
+    setSimAmanLongStop(false);
     setSimKaranSplit(false);
-    emitSimulatedStep(0, false, false);
+    setSimRahulArrived(false);
+    setSimAllArrived(false);
+    emitSimulatedStep(0, false, false, false, false, false);
   };
 
   const triggerAmanStop = () => {
     const next = !simAmanStopped;
     setSimAmanStopped(next);
-    emitSimulatedStep(stepIndex, next, simKaranSplit);
+    setSimAmanLongStop(false);
+    emitSimulatedStep(stepIndex, next, false, simKaranSplit, simRahulArrived, simAllArrived);
+  };
+
+  const triggerAmanLongStop = () => {
+    const next = !simAmanLongStop;
+    setSimAmanLongStop(next);
+    setSimAmanStopped(next);
+    emitSimulatedStep(stepIndex, next, next, simKaranSplit, simRahulArrived, simAllArrived);
   };
 
   const triggerKaranSplit = () => {
     const next = !simKaranSplit;
     setSimKaranSplit(next);
-    emitSimulatedStep(stepIndex, simAmanStopped, next);
+    emitSimulatedStep(stepIndex, simAmanStopped, simAmanLongStop, next, simRahulArrived, simAllArrived);
+  };
+
+  const triggerRahulArrival = () => {
+    const next = !simRahulArrived;
+    setSimRahulArrived(next);
+    emitSimulatedStep(stepIndex, simAmanStopped, simAmanLongStop, simKaranSplit, next, simAllArrived);
+  };
+
+  const triggerAllArrival = () => {
+    const next = !simAllArrived;
+    setSimAllArrived(next);
+    emitSimulatedStep(stepIndex, simAmanStopped, simAmanLongStop, simKaranSplit, simRahulArrived, next);
   };
 
   if (isMinimized) {
     return (
-      <button
-        onClick={() => setIsMinimized(false)}
-        className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-white text-[#202124] text-xs font-bold shadow-md border border-[#dadce0] hover:bg-[#f8f9fa] transition-all"
-      >
-        <span className="flex h-2 w-2 relative">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#f9ab00] opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-[#f9ab00]"></span>
-        </span>
-        <span>⚡ Demo Controller</span>
-        <ChevronUp className="w-3.5 h-3.5 text-[#5f6368]" />
-      </button>
+      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md text-[#202124] text-xs font-bold shadow-md border border-[#dadce0] pointer-events-auto">
+        <button
+          onClick={handleTogglePlay}
+          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${
+            isSimulationActive
+              ? 'bg-[#fef7e0] text-[#b06000] border border-[#feefc3]'
+              : 'bg-[#1a73e8] text-white'
+          }`}
+        >
+          {isSimulationActive ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+          <span>{isSimulationActive ? 'Pause' : 'Simulate'}</span>
+        </button>
+
+        <button
+          onClick={() => setIsMinimized(false)}
+          className="flex items-center gap-1 pl-1 text-[#5f6368] hover:text-[#202124] transition-colors"
+          title="Expand Simulation Controls"
+        >
+          <span>⚡ Demo</span>
+          <ChevronUp className="w-3.5 h-3.5" />
+        </button>
+      </div>
     );
   }
 
   return (
-    <div className="bg-white border border-[#dadce0] rounded-3xl p-3 sm:p-3.5 shadow-xl max-w-2xl w-full">
+    <div className="bg-white/95 backdrop-blur-md border border-[#dadce0] rounded-3xl p-3 sm:p-3.5 shadow-xl max-w-[95vw] sm:max-w-md w-full animate-in fade-in slide-in-from-bottom-2 duration-150">
       {/* Header Bar */}
-      <div className="flex items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-[#f1f3f4]">
-        <div className="flex items-center gap-2">
-          <span className="flex h-2 w-2 relative">
+      <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-[#f1f3f4]">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex h-2 w-2 relative shrink-0">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#f9ab00] opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-[#f9ab00]"></span>
           </span>
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[#b06000]">
-            Convoy Simulation Engine
-          </span>
-          <span className="text-[10px] text-[#5f6368] hidden sm:inline">
-            (5 simulated travelers)
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#b06000] truncate">
+            Convoy Simulation
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Speed Multipliers */}
-          <div className="flex items-center gap-0.5 bg-[#f8f9fa] px-1.5 py-0.5 rounded-full border border-[#dadce0] text-[11px]">
+          <div className="flex items-center gap-0.5 bg-[#f8f9fa] px-1 py-0.5 rounded-full border border-[#dadce0] text-[10px]">
             {[1, 2, 5, 10].map((s) => (
               <button
                 key={s}
                 onClick={() => setSpeedMultiplier(s)}
-                className={`px-2 py-0.2 rounded-full font-mono font-bold transition-colors ${
+                className={`px-1.5 py-0.2 rounded-full font-mono font-bold transition-colors ${
                   speedMultiplier === s
                     ? 'bg-[#1a73e8] text-white'
                     : 'text-[#5f6368] hover:text-[#202124]'
@@ -234,18 +352,18 @@ export function DemoController() {
       </div>
 
       {/* Main Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="space-y-2">
         {/* Playback Controls */}
         <div className="flex items-center gap-1.5">
           <button
             onClick={handleTogglePlay}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-sm transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shadow-xs transition-all ${
               isSimulationActive
                 ? 'bg-[#fef7e0] border border-[#feefc3] text-[#b06000]'
                 : 'bg-[#1a73e8] hover:bg-[#1557d0] text-white'
             }`}
           >
-            {isSimulationActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            {isSimulationActive ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
             <span>{isSimulationActive ? 'Pause' : 'Start'}</span>
           </button>
 
@@ -259,22 +377,35 @@ export function DemoController() {
         </div>
 
         {/* Quick Scenario Triggers */}
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1 text-xs">
           <button
             onClick={triggerAmanStop}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
-              simAmanStopped
+            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold border transition-all text-[11px] ${
+              simAmanStopped && !simAmanLongStop
                 ? 'bg-[#fce8e6] border-[#fad2cf] text-[#c5221f]'
                 : 'bg-white border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
             }`}
           >
             <span>🛑</span>
-            <span>{simAmanStopped ? 'Resume Aman' : 'Stop Aman'}</span>
+            <span>{simAmanStopped && !simAmanLongStop ? 'Resume Aman' : 'Stop Aman'}</span>
+          </button>
+
+          <button
+            onClick={triggerAmanLongStop}
+            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold border transition-all text-[11px] ${
+              simAmanLongStop
+                ? 'bg-[#fce8e6] border-[#fad2cf] text-[#c5221f]'
+                : 'bg-white border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
+            }`}
+            title="Trigger 10-Minute Stationary Stop at Murthal with nearby Petrol & Hotel"
+          >
+            <span>⚡</span>
+            <span>{simAmanLongStop ? 'End Stop' : '10-Min Stop (Aman)'}</span>
           </button>
 
           <button
             onClick={triggerKaranSplit}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold border transition-all text-[11px] ${
               simKaranSplit
                 ? 'bg-[#fef7e0] border-[#feefc3] text-[#b06000]'
                 : 'bg-white border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
@@ -282,6 +413,32 @@ export function DemoController() {
           >
             <span>⚠</span>
             <span>{simKaranSplit ? 'Rejoin Karan' : 'Split Karan (7.8km)'}</span>
+          </button>
+
+          <button
+            onClick={triggerRahulArrival}
+            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold border transition-all text-[11px] ${
+              simRahulArrived
+                ? 'bg-[#e6f4ea] border-[#ceead6] text-[#137333]'
+                : 'bg-white border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
+            }`}
+            title="Simulate Leader Rahul reaching destination"
+          >
+            <span>🏁</span>
+            <span>{simRahulArrived ? 'Reset' : 'Simulate Arrival (Rahul)'}</span>
+          </button>
+
+          <button
+            onClick={triggerAllArrival}
+            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold border transition-all text-[11px] ${
+              simAllArrived
+                ? 'bg-[#e6f4ea] border-[#ceead6] text-[#137333]'
+                : 'bg-white border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
+            }`}
+            title="Simulate all 5 convoy members reaching destination"
+          >
+            <span>🎉</span>
+            <span>{simAllArrived ? 'Reset' : 'All Arrive'}</span>
           </button>
         </div>
       </div>

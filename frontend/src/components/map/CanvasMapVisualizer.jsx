@@ -3,12 +3,15 @@ import useTripStore, { selectTravelers } from '../../store/tripStore.js';
 import useAuthStore from '../../store/authStore.js';
 import { Navigation } from 'lucide-react';
 
-export function CanvasMapVisualizer() {
+export function CanvasMapVisualizer(props = {}) {
   const {
     trip,
     members,
     liveLocations,
     stops,
+    pois: storePOIs,
+    selectedPOI,
+    setSelectedPOI,
     groupCenter,
     selectedMemberId,
     setSelectedMemberId,
@@ -23,6 +26,9 @@ export function CanvasMapVisualizer() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  const rawPois = props?.pois !== undefined ? props.pois : storePOIs;
+  const pois = Array.isArray(rawPois) ? rawPois : [];
 
   const travelers = selectTravelers(members, liveLocations, currentUser?.id);
 
@@ -285,6 +291,50 @@ export function CanvasMapVisualizer() {
           );
         })}
 
+        {/* POI Markers: Petrol Stations ⛽ */}
+        {layerVisibility?.petrol && (pois || []).filter(p => p.type === 'petrol').map((poi) => {
+          if (!poi.latitude || !poi.longitude) return null;
+          const proj = projectCoords(poi.latitude, poi.longitude);
+          return (
+            <div
+              key={poi.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedPOI(poi);
+              }}
+              className="absolute transform -translate-x-1/2 -translate-y-1/2 z-15 cursor-pointer hover:scale-115 transition-transform pointer-events-auto"
+              style={{ left: `${proj.x}%`, top: `${proj.y}%` }}
+              title={`${poi.name} (Petrol Station)`}
+            >
+              <div className="w-6 h-6 rounded-full bg-white border border-[#dadce0] shadow-sm flex items-center justify-center text-xs hover:border-[#1a73e8]">
+                ⛽
+              </div>
+            </div>
+          );
+        })}
+
+        {/* POI Markers: Hotels 🏨 */}
+        {layerVisibility?.hotels && (pois || []).filter(p => p.type === 'hotel').map((poi) => {
+          if (!poi.latitude || !poi.longitude) return null;
+          const proj = projectCoords(poi.latitude, poi.longitude);
+          return (
+            <div
+              key={poi.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedPOI(poi);
+              }}
+              className="absolute transform -translate-x-1/2 -translate-y-1/2 z-15 cursor-pointer hover:scale-115 transition-transform pointer-events-auto"
+              style={{ left: `${proj.x}%`, top: `${proj.y}%` }}
+              title={`${poi.name} (Hotel / Lodging)`}
+            >
+              <div className="w-6 h-6 rounded-full bg-white border border-[#dadce0] shadow-sm flex items-center justify-center text-xs hover:border-[#1a73e8]">
+                🏨
+              </div>
+            </div>
+          );
+        })}
+
         {/* Live Active Member Markers (Every reporting traveler) */}
         {layerVisibility?.members && travelers.map((t) => {
           if (!t.latitude || !t.longitude || t.isSharingOff || t.status === 'OFFLINE') {
@@ -295,44 +345,40 @@ export function CanvasMapVisualizer() {
           const isSelected = selectedMemberId === t.id;
           const isStopped = t.status === 'STOPPED' || t.status === 'POSSIBLE_STOP';
           const isSplit = t.status === 'SPLIT' || t.status === 'FALLING_BEHIND';
+          const isArrived = t.status === 'ARRIVED';
+          const isLeader = t.isLeader;
 
           return (
             <div
               key={t.id}
               onClick={(e) => {
                 e.stopPropagation();
-                setSelectedMemberId(t.id);
+                setSelectedMemberId(isSelected ? null : t.id);
               }}
-              className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-30 cursor-pointer transition-all duration-300 pointer-events-auto ${
-                isSelected ? 'scale-120 z-40' : 'hover:scale-110'
+              className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-30 cursor-pointer transition-all duration-200 pointer-events-auto ${
+                isSelected ? 'scale-125 z-40' : 'hover:scale-110'
               }`}
               style={{ left: `${proj.x}%`, top: `${proj.y}%` }}
             >
               <div className="relative flex flex-col items-center group">
-                {/* Direction Heading Pointer (when moving with heading) */}
-                {!isStopped && t.heading !== undefined && (
-                  <div
-                    className="absolute -top-3 w-4 h-4 text-[#1a73e8] transition-transform pointer-events-none"
-                    style={{ transform: `rotate(${t.heading}deg)` }}
-                  >
-                    <Navigation className="w-3.5 h-3.5 fill-[#1a73e8]" />
-                  </div>
-                )}
-
                 {/* Radar pulse ring for moving users */}
-                {!isStopped && (
-                  <span className="absolute -inset-1.5 rounded-full bg-[#1a73e8]/20 animate-radar pointer-events-none" />
+                {!isStopped && !isArrived && (
+                  <span className="absolute -inset-1 rounded-full bg-[#1a73e8]/20 animate-radar pointer-events-none" />
                 )}
 
-                {/* Custom Google Maps Marker Pin */}
+                {/* Minimalist Google Maps Marker Pin */}
                 <div
-                  className={`relative w-9 h-9 rounded-full border-2 p-0.5 bg-white shadow-md transition-colors ${
-                    isStopped
-                      ? 'border-[#d93025] ring-3 ring-[#d93025]/20'
+                  className={`relative w-8 h-8 rounded-full border-2 p-0.5 bg-white shadow-md transition-colors ${
+                    isArrived
+                      ? 'border-[#1e8e3e] ring-2 ring-[#1e8e3e]/30'
+                      : isStopped
+                      ? 'border-[#d93025] ring-2 ring-[#d93025]/30'
                       : isSplit
-                      ? 'border-[#f9ab00] ring-3 ring-[#f9ab00]/25'
+                      ? 'border-[#f9ab00] ring-2 ring-[#f9ab00]/35'
+                      : isLeader
+                      ? 'border-[#f9ab00] ring-2 ring-[#f9ab00]/40'
                       : t.isMe
-                      ? 'border-[#1a73e8] ring-3 ring-[#1a73e8]/30'
+                      ? 'border-[#1a73e8] ring-2 ring-[#1a73e8]/40'
                       : 'border-[#1e8e3e]'
                   }`}
                 >
@@ -342,18 +388,29 @@ export function CanvasMapVisualizer() {
                     className="w-full h-full rounded-full object-cover"
                   />
 
-                  {/* Micro state icon badge */}
+                  {/* Micro state indicator */}
                   <span
-                    className={`absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white border border-white ${
-                      isStopped ? 'bg-[#d93025]' : isSplit ? 'bg-[#f9ab00]' : t.isMe ? 'bg-[#1a73e8]' : 'bg-[#1e8e3e]'
+                    className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white flex items-center justify-center text-[7px] text-white font-extrabold ${
+                      isArrived
+                        ? 'bg-[#1e8e3e]'
+                        : isStopped
+                        ? 'bg-[#d93025]'
+                        : isSplit
+                        ? 'bg-[#f9ab00]'
+                        : isLeader
+                        ? 'bg-[#f9ab00]'
+                        : t.isMe
+                        ? 'bg-[#1a73e8]'
+                        : 'bg-[#1e8e3e]'
                     }`}
                   >
-                    {isStopped ? '🛑' : isSplit ? '⚠' : t.isMe ? '★' : '▶'}
+                    {isArrived ? '✓' : isLeader ? '👑' : ''}
                   </span>
                 </div>
 
-                {/* Floating Member Info Tag */}
-                <div className="mt-1 px-2 py-0.5 rounded-full bg-white border border-[#dadce0] shadow-sm flex items-center gap-1 whitespace-nowrap">
+                {/* Compact Name Tag */}
+                <div className="mt-0.5 px-2 py-0.2 rounded-full bg-white/90 backdrop-blur-xs border border-[#dadce0] shadow-xs flex items-center gap-1 whitespace-nowrap">
+                  {isLeader && <span className="text-[9px]">👑</span>}
                   <span className="text-[10px] font-bold text-[#202124]">
                     {t.name}
                   </span>
@@ -362,14 +419,9 @@ export function CanvasMapVisualizer() {
                       YOU
                     </span>
                   )}
-                  {t.speed !== null && t.speed > 0 && !isStopped && (
-                    <span className="text-[9px] font-mono font-semibold text-[#1a73e8]">
-                      · {Math.round(t.speed)} km/h
-                    </span>
-                  )}
-                  {isStopped && (
-                    <span className="text-[9px] font-semibold text-[#d93025]">
-                      · Stopped
+                  {isArrived && (
+                    <span className="text-[8px] font-bold text-[#137333]">
+                      ✓ Arrived
                     </span>
                   )}
                 </div>
@@ -378,6 +430,139 @@ export function CanvasMapVisualizer() {
           );
         })}
       </div>
+
+      {/* PROGRESSIVE DISCLOSURE: FLOATING SELECTED TRAVELER CARD (Bottom-Left) */}
+      {selectedMemberId && (() => {
+        const sel = travelers.find(t => t.id === selectedMemberId);
+        if (!sel) return null;
+
+        const isStopped = sel.status === 'STOPPED' || sel.status === 'POSSIBLE_STOP';
+        const isSplit = sel.status === 'SPLIT' || sel.status === 'FALLING_BEHIND';
+        const isArrived = sel.status === 'ARRIVED';
+        const isLeader = sel.isLeader;
+
+        return (
+          <div className="absolute bottom-22 sm:bottom-6 left-3 sm:left-4 z-40 max-w-[calc(100vw-24px)] sm:max-w-xs w-full bg-white/95 backdrop-blur-md border border-[#dadce0] p-3 rounded-3xl shadow-xl space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-auto text-xs">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <img
+                  src={sel.profile_image}
+                  alt={sel.name}
+                  className="w-9 h-9 rounded-full bg-[#f1f3f4] border border-[#dadce0] object-cover"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h4 className="text-xs font-bold text-[#202124] truncate">{sel.name}</h4>
+                    {isLeader && (
+                      <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-[#fef7e0] text-[#b06000] border border-[#feefc3]">
+                        👑 LEADER
+                      </span>
+                    )}
+                    {sel.isMe && (
+                      <span className="text-[8px] font-extrabold uppercase px-1.5 py-0.2 rounded-full bg-[#1a73e8] text-white">
+                        YOU
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#5f6368] truncate font-medium">
+                    {sel.locationName}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedMemberId(null)}
+                className="p-1 text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] rounded-full text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Status & Metrics Bar */}
+            <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-[#f1f3f4] text-xs">
+              <div className="bg-[#f8f9fa] p-1.5 rounded-xl border border-[#dadce0] text-center">
+                <span className="text-[9px] text-[#5f6368] block font-medium">Status</span>
+                <span className={`font-bold text-[11px] ${isArrived ? 'text-[#137333]' : isStopped ? 'text-[#d93025]' : isSplit ? 'text-[#b06000]' : 'text-[#137333]'}`}>
+                  {isArrived ? '✓ Arrived' : isStopped ? '🛑 Stopped' : isSplit ? '⚠ Behind' : '🟢 Moving'}
+                </span>
+              </div>
+              <div className="bg-[#f8f9fa] p-1.5 rounded-xl border border-[#dadce0] text-center">
+                <span className="text-[9px] text-[#5f6368] block font-medium">Speed</span>
+                <span className="font-mono font-bold text-[11px] text-[#202124]">
+                  {isArrived || isStopped ? '0 km/h' : sel.speed !== null ? `${Math.round(sel.speed)} km/h` : '--'}
+                </span>
+              </div>
+            </div>
+
+            {/* Additional Context Banners */}
+            {isArrived && (
+              <p className="text-[11px] text-[#137333] font-semibold bg-[#e6f4ea] px-2.5 py-1 rounded-xl border border-[#ceead6]">
+                Reached destination {sel.arrivedAtTimeText ? `at ${sel.arrivedAtTimeText}` : ''}
+              </p>
+            )}
+            {isStopped && (
+              <div className="space-y-1">
+                <p className="text-[11px] text-[#c5221f] font-semibold bg-[#fce8e6] px-2.5 py-1 rounded-xl">
+                  Stopped for {sel.stopDurationText || '0 min'} {sel.isLongStop ? '⚠ (Stationary 10+ min)' : ''}
+                </p>
+                {sel.nearbyPetrol && (
+                  <p className="text-[10px] text-[#202124] bg-[#f8f9fa] px-2 py-0.5 rounded-lg border border-[#dadce0]">
+                    ⛽ Petrol nearby: <span className="font-semibold">{sel.nearbyPetrol.name} ({sel.nearbyPetrol.distanceText})</span>
+                  </p>
+                )}
+                {sel.nearbyHotel && (
+                  <p className="text-[10px] text-[#202124] bg-[#f8f9fa] px-2 py-0.5 rounded-lg border border-[#dadce0]">
+                    🏨 Hotel nearby: <span className="font-semibold">{sel.nearbyHotel.name} ({sel.nearbyHotel.distanceText})</span>
+                  </p>
+                )}
+              </div>
+            )}
+            {isSplit && (
+              <p className="text-[11px] text-[#b06000] font-semibold bg-[#fef7e0] px-2.5 py-1 rounded-xl">
+                {sel.distanceFromGroupKm ? `${sel.distanceFromGroupKm} km behind convoy` : 'Falling behind convoy'}
+              </p>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* PROGRESSIVE DISCLOSURE: FLOATING SELECTED POI CARD (Bottom-Left) */}
+      {selectedPOI && (
+        <div className="absolute bottom-22 sm:bottom-6 left-3 sm:left-4 z-40 max-w-[calc(100vw-24px)] sm:max-w-xs w-full bg-white/95 backdrop-blur-md border border-[#dadce0] p-3 rounded-3xl shadow-xl space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-auto text-xs">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-2xl bg-[#e8f0fe] border border-[#d2e3fc] flex items-center justify-center text-base shrink-0">
+                {selectedPOI.icon || (selectedPOI.type === 'petrol' ? '⛽' : '🏨')}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h4 className="text-xs font-bold text-[#202124] truncate">{selectedPOI.name}</h4>
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-[#f1f3f4] text-[#5f6368]">
+                    {selectedPOI.categoryText || (selectedPOI.type === 'petrol' ? 'Petrol Station' : 'Hotel')}
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#5f6368] truncate font-medium">
+                  {selectedPOI.address || 'Along Highway Route'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedPOI(null)}
+              className="p-1 text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] rounded-full text-xs font-bold"
+            >
+              ✕
+            </button>
+          </div>
+
+          {selectedPOI.distanceText && (
+            <div className="pt-1 border-t border-[#f1f3f4] flex items-center justify-between text-xs">
+              <span className="text-[#5f6368] font-medium text-[11px]">Distance from route:</span>
+              <span className="font-bold text-[#1a73e8] font-mono text-[11px]">{selectedPOI.distanceText}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

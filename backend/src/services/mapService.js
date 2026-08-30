@@ -1,6 +1,7 @@
 import { haversineDistanceKm } from '../utils/geo.js';
 
 const geocodeCache = new Map();
+const poiCache = new Map();
 
 // Known waypoint database for instant and realistic offline reverse geocoding
 const knownWaypoints = [
@@ -30,44 +31,115 @@ const knownWaypoints = [
   { name: 'Solang Valley, Manali', lat: 32.3166, lng: 77.1575, radiusKm: 6 }
 ];
 
+function getApiKey() {
+  return process.env.GEOAPIFY_API_KEY || process.env.GOOGLE_MAPS_API_KEY || '';
+}
+
+function isValidCoordinate(lat, lng) {
+  return typeof lat === 'number' && typeof lng === 'number' &&
+    !isNaN(lat) && !isNaN(lng) &&
+    lat >= -90 && lat <= 90 &&
+    lng >= -180 && lng <= 180;
+}
+
 export const mapService = {
   /**
-   * Reverse Geocode Lat/Lng into human-readable location name
+   * Forward Geocoding: Converts an address/city text query into coordinates via Geoapify
+   */
+  async geocode(address) {
+    if (!address || typeof address !== 'string' || address.trim().length === 0) {
+      return null;
+    }
+
+    const cleanAddress = address.trim();
+    const cacheKey = `geo:${cleanAddress.toLowerCase()}`;
+    if (geocodeCache.has(cacheKey)) {
+      return geocodeCache.get(cacheKey);
+    }
+
+    const apiKey = getApiKey();
+    if (apiKey) {
+      try {
+        const url = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(cleanAddress)}&apiKey=${apiKey}`;
+        const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.features && data.features.length > 0) {
+            const first = data.features[0];
+            const result = {
+              latitude: first.properties.lat || first.geometry.coordinates[1],
+              longitude: first.properties.lon || first.geometry.coordinates[0],
+              formattedAddress: first.properties.formatted || cleanAddress,
+              city: first.properties.city || first.properties.county || '',
+              country: first.properties.country || ''
+            };
+            geocodeCache.set(cacheKey, result);
+            return result;
+          }
+        }
+      } catch (err) {
+        console.warn('[MapService] Geoapify Geocoding API call failed:', err.message);
+      }
+    }
+
+    // Waypoint match fallback
+    const matched = knownWaypoints.find(w => w.name.toLowerCase().includes(cleanAddress.toLowerCase()));
+    if (matched) {
+      const result = {
+        latitude: matched.lat,
+        longitude: matched.lng,
+        formattedAddress: matched.name,
+        city: '',
+        country: 'India'
+      };
+      geocodeCache.set(cacheKey, result);
+      return result;
+    }
+
+    return null;
+  },
+
+  /**
+   * Reverse Geocode Lat/Lng into human-readable location name via Geoapify
    */
   async reverseGeocode(latitude, longitude) {
+    if (!isValidCoordinate(latitude, longitude)) {
+      return 'Location coordinates invalid';
+    }
+
     const cacheKey = `${latitude.toFixed(4)},${longitude.toFixed(4)}`;
     if (geocodeCache.has(cacheKey)) {
       return geocodeCache.get(cacheKey);
     }
 
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    const apiKey = getApiKey();
 
     if (apiKey) {
       try {
-        const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`;
-        const response = await fetch(url);
-        const data = await response.json();
+        const url = `https://api.geoapify.com/v1/geocode/reverse?lat=${latitude}&lon=${longitude}&apiKey=${apiKey}`;
+        const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
 
-        if (data.status === 'OK' && data.results && data.results.length > 0) {
-          // Format a nice concise place name
-          const result = data.results[0];
-          let placeName = result.formatted_address;
-          
-          // Try to extract neighborhood or locality
-          const localityComp = result.address_components.find(c => 
-            c.types.includes('locality') || c.types.includes('sublocality') || c.types.includes('point_of_interest')
-          );
-          const stateComp = result.address_components.find(c => c.types.includes('administrative_area_level_1'));
-          
-          if (localityComp) {
-            placeName = `${localityComp.long_name}${stateComp ? `, ${stateComp.short_name}` : ''}`;
+        if (response.ok) {
+          const data = await response.json();
+          if (data.features && data.features.length > 0) {
+            const result = data.features[0];
+            let placeName = result.properties.formatted;
+
+            // Extract concise locality / landmark name
+            if (result.properties.name) {
+              const city = result.properties.city || result.properties.county || result.properties.state || '';
+              placeName = city ? `${result.properties.name}, ${city}` : result.properties.name;
+            } else if (result.properties.street) {
+              const city = result.properties.city || result.properties.county || '';
+              placeName = city ? `${result.properties.street}, ${city}` : result.properties.street;
+            }
+
+            geocodeCache.set(cacheKey, placeName);
+            return placeName;
           }
-
-          geocodeCache.set(cacheKey, placeName);
-          return placeName;
         }
       } catch (err) {
-        console.warn('[MapService] Google Geocoding API call failed:', err.message);
+        console.warn('[MapService] Geoapify Reverse Geocoding API call failed:', err.message);
       }
     }
 
@@ -95,75 +167,82 @@ export const mapService = {
   },
 
   /**
-   * Calculate Route Polyline & details between Origin and Destination
+   * Calculate Route Polyline & details between Origin and Destination via Geoapify
    */
   async calculateRoute(origin, destination) {
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+    const originLat = typeof origin === 'object' ? origin.lat : 28.6315;
+    const originLng = typeof origin === 'object' ? origin.lng : 77.2167;
+    const destLat = typeof destination === 'object' ? destination.lat : 32.2396;
+    const destLng = typeof destination === 'object' ? destination.lng : 77.1887;
 
-    if (apiKey) {
+    const apiKey = getApiKey();
+
+    if (apiKey && isValidCoordinate(originLat, originLng) && isValidCoordinate(destLat, destLng)) {
       try {
-        const originStr = typeof origin === 'object' ? `${origin.lat},${origin.lng}` : origin;
-        const destStr = typeof destination === 'object' ? `${destination.lat},${destination.lng}` : destination;
-        const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(originStr)}&destination=${encodeURIComponent(destStr)}&key=${apiKey}`;
-        
-        const response = await fetch(url);
-        const data = await response.json();
+        const url = `https://api.geoapify.com/v1/routing?waypoints=${originLat},${originLng}|${destLat},${destLng}&mode=drive&apiKey=${apiKey}`;
+        const response = await fetch(url, { signal: AbortSignal.timeout(6000) });
 
-        if (data.status === 'OK' && data.routes && data.routes.length > 0) {
-          const route = data.routes[0];
-          const leg = route.legs[0];
+        if (response.ok) {
+          const data = await response.json();
+          if (data.features && data.features.length > 0) {
+            const routeProps = data.features[0].properties;
+            const distKm = Math.round((routeProps.distance || 535000) / 1000);
+            const timeSec = routeProps.time || 41400;
+            const hours = Math.floor(timeSec / 3600);
+            const mins = Math.round((timeSec % 3600) / 60);
 
-          return {
-            polyline: route.overview_polyline.points,
-            distance: leg.distance.text,
-            duration: leg.duration.text,
-            start_address: leg.start_address,
-            end_address: leg.end_address,
-            start_location: leg.start_location,
-            end_location: leg.end_location,
-            steps: leg.steps.map(s => ({
-              instructions: s.html_instructions.replace(/<[^>]*>?/gm, ''),
-              distance: s.distance.text,
-              duration: s.duration.text,
-              end_location: s.end_location
-            }))
-          };
+            return {
+              polyline: '',
+              distance: `${distKm} km`,
+              duration: `${hours} hours ${mins} mins`,
+              start_address: typeof origin === 'string' ? origin : 'Origin Point',
+              end_address: typeof destination === 'string' ? destination : 'Destination Point',
+              start_location: { lat: originLat, lng: originLng },
+              end_location: { lat: destLat, lng: destLng }
+            };
+          }
         }
       } catch (err) {
-        console.warn('[MapService] Google Directions API failed, using standard route coordinates:', err.message);
+        console.warn('[MapService] Geoapify Routing API failed, using calculated metrics:', err.message);
       }
     }
 
-    // Standard high-resolution route points for Delhi -> Manali
-    const defaultRoute = {
-      distance: '535 km',
-      duration: '11 hours 30 mins',
+    // Calculated standard road metrics
+    const distanceKm = Math.round(haversineDistanceKm(originLat, originLng, destLat, destLng) * 1.25);
+    const estimatedHours = Math.round(distanceKm / 45);
+
+    return {
+      distance: `${distanceKm} km`,
+      duration: `${estimatedHours} hours`,
       start_address: typeof origin === 'string' ? origin : 'New Delhi, India',
       end_address: typeof destination === 'string' ? destination : 'Manali, Himachal Pradesh',
-      start_location: { lat: 28.6315, lng: 77.2167 },
-      end_location: { lat: 32.2396, lng: 77.1887 },
+      start_location: { lat: originLat, lng: originLng },
+      end_location: { lat: destLat, lng: destLng },
       waypoints: knownWaypoints.map(w => ({ lat: w.lat, lng: w.lng, name: w.name }))
     };
-
-    return defaultRoute;
   },
 
   /**
    * Calculate ETA for an individual from current coordinate to destination
    */
   calculateIndividualEta(currentLat, currentLng, destLat, destLng, currentSpeedKmh = 45) {
+    if (!isValidCoordinate(currentLat, currentLng) || !isValidCoordinate(destLat, destLng)) {
+      return {
+        distanceKm: 0,
+        totalMinutes: 0,
+        formattedEta: 'N/A',
+        arrivalTimestamp: new Date().toISOString()
+      };
+    }
+
     const distanceKm = haversineDistanceKm(currentLat, currentLng, destLat, destLng);
-    
-    // Average road circuity factor on Indian highways/hills is approx 1.25x
     const roadDistanceKm = distanceKm * 1.25;
-    
-    // Effective speed considering mountain/city slowdowns
+
     let effectiveSpeed = currentSpeedKmh > 10 ? currentSpeedKmh : 40;
     if (currentLat > 31.2) {
-      // Mountain highway speed limitation
       effectiveSpeed = Math.min(effectiveSpeed, 35);
     }
-    
+
     const hours = roadDistanceKm / effectiveSpeed;
     const totalMinutes = Math.round(hours * 60);
 
@@ -179,7 +258,7 @@ export const mapService = {
   },
 
   /**
-   * Calculate Clustered Group ETA (reflecting the true group arrival considering trailing members)
+   * Calculate Clustered Group ETA
    */
   calculateGroupEta(activeMembers, destLat, destLng) {
     if (!activeMembers || activeMembers.length === 0) {
@@ -197,7 +276,6 @@ export const mapService = {
       return eta.totalMinutes;
     });
 
-    // Group ETA is weighted towards the trailing 80th percentile so everyone arrives together
     memberEtas.sort((a, b) => a - b);
     const slowestIndex = Math.min(memberEtas.length - 1, Math.floor(memberEtas.length * 0.8));
     const groupMinutes = memberEtas[slowestIndex];
@@ -210,6 +288,114 @@ export const mapService = {
       totalMinutes: groupMinutes,
       arrivalTimestamp: new Date(Date.now() + groupMinutes * 60 * 1000).toISOString()
     };
+  },
+
+  /**
+   * Search Nearby POIs (Petrol Stations and Hotels) around a geographic point using Geoapify Places API
+   */
+  async searchNearbyPOIs(latitude, longitude, radiusMeters = 1500) {
+    if (!isValidCoordinate(latitude, longitude)) return [];
+
+    const cacheKey = `poi:${latitude.toFixed(3)},${longitude.toFixed(3)}:${radiusMeters}`;
+    if (poiCache.has(cacheKey)) {
+      return poiCache.get(cacheKey);
+    }
+
+    const apiKey = getApiKey();
+    const categories = ['service.vehicle.fuel', 'accommodation.hotel'];
+
+    if (apiKey) {
+      try {
+        const url = `https://api.geoapify.com/v2/places?categories=${categories.join(',')}&filter=circle:${longitude},${latitude},${radiusMeters}&limit=12&apiKey=${apiKey}`;
+        const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.features && data.features.length > 0) {
+            const pois = data.features.map(f => {
+              const p = f.properties;
+              const isFuel = (p.categories || []).some(c => c.includes('fuel') || c.includes('gas'));
+              const isHotel = (p.categories || []).some(c => c.includes('hotel') || c.includes('accommodation'));
+              const distance = p.distance || Math.round(haversineDistanceKm(latitude, longitude, p.lat, p.lon) * 1000);
+
+              return {
+                id: p.place_id || `${p.lat},${p.lon}`,
+                name: p.name || (isFuel ? 'Petrol Station' : 'Hotel / Lodging'),
+                type: isFuel ? 'petrol' : isHotel ? 'hotel' : 'other',
+                categoryText: isFuel ? 'Petrol Station' : 'Hotel',
+                icon: isFuel ? '⛽' : '🏨',
+                latitude: p.lat,
+                longitude: p.lon,
+                distanceMeters: distance,
+                distanceText: distance < 1000 ? `${distance} m` : `${(distance / 1000).toFixed(1)} km`,
+                address: p.formatted || p.address_line2 || ''
+              };
+            });
+
+            poiCache.set(cacheKey, pois);
+            return pois;
+          }
+        }
+      } catch (err) {
+        console.warn('[MapService] Geoapify Places API call failed:', err.message);
+      }
+    }
+
+    // Curated corridor POI database fallback for NH44 / NH21 corridor (Murthal, Karnal, Ambala, Mandi, Manali)
+    const corridorPOIs = [
+      { name: 'HP Petrol Pump (Sukhdev Hub)', type: 'petrol', icon: '⛽', lat: 29.0270, lng: 77.0710, address: 'NH44, Murthal' },
+      { name: 'IndianOil Fuel Station', type: 'petrol', icon: '⛽', lat: 29.0255, lng: 77.0690, address: 'Murthal Chowk' },
+      { name: 'Hotel Highway King', type: 'hotel', icon: '🏨', lat: 29.0280, lng: 77.0725, address: 'Murthal Corridor' },
+      { name: 'Bharat Petroleum Oasis', type: 'petrol', icon: '⛽', lat: 29.6860, lng: 76.9910, address: 'Karnal Tollway' },
+      { name: 'Karnal Haveli Resort', type: 'hotel', icon: '🏨', lat: 29.6870, lng: 76.9920, address: 'GT Road, Karnal' },
+      { name: 'IndianOil Swarghat Hub', type: 'petrol', icon: '⛽', lat: 31.2340, lng: 76.7180, address: 'NH21 Swarghat' },
+      { name: 'Himachal Tourism Hotel', type: 'hotel', icon: '🏨', lat: 31.3410, lng: 76.7610, address: 'Bilaspur' },
+      { name: 'HP Petrol Pump Mandi', type: 'petrol', icon: '⛽', lat: 31.7090, lng: 76.9330, address: 'Mandi By-Pass' },
+      { name: 'River View Resort', type: 'hotel', icon: '🏨', lat: 31.9590, lng: 77.1105, address: 'Kullu Valley' },
+      { name: 'IndianOil Mall Road', type: 'petrol', icon: '⛽', lat: 32.2380, lng: 77.1870, address: 'Manali Town' },
+      { name: 'Snow Valley Resort', type: 'hotel', icon: '🏨', lat: 32.2400, lng: 77.1895, address: 'Mall Road, Manali' }
+    ];
+
+    const matched = [];
+    for (const cp of corridorPOIs) {
+      const distM = Math.round(haversineDistanceKm(latitude, longitude, cp.lat, cp.lng) * 1000);
+      if (distM <= radiusMeters) {
+        matched.push({
+          id: `fallback-${cp.lat}-${cp.lng}`,
+          name: cp.name,
+          type: cp.type,
+          categoryText: cp.type === 'petrol' ? 'Petrol Station' : 'Hotel',
+          icon: cp.icon,
+          latitude: cp.lat,
+          longitude: cp.lng,
+          distanceMeters: distM,
+          distanceText: distM < 1000 ? `${distM} m` : `${(distM / 1000).toFixed(1)} km`,
+          address: cp.address
+        });
+      }
+    }
+
+    poiCache.set(cacheKey, matched);
+    return matched;
+  },
+
+  /**
+   * Search Route Corridor POIs along highway
+   */
+  async searchRouteCorridorPOIs() {
+    const defaultPOIs = [
+      { id: 'poi-murthal-petrol', name: 'HP Petrol Pump (Sukhdev Hub)', type: 'petrol', icon: '⛽', latitude: 29.0270, longitude: 77.0710, address: 'NH44 Murthal, Haryana' },
+      { id: 'poi-murthal-hotel', name: 'Hotel Highway King', type: 'hotel', icon: '🏨', latitude: 29.0280, longitude: 77.0725, address: 'Murthal Corridor, Haryana' },
+      { id: 'poi-karnal-petrol', name: 'Bharat Petroleum Oasis', type: 'petrol', icon: '⛽', latitude: 29.6860, longitude: 76.9910, address: 'Karnal Highway Oasis' },
+      { id: 'poi-karnal-hotel', name: 'Karnal Haveli Resort', type: 'hotel', icon: '🏨', latitude: 29.6870, longitude: 76.9920, address: 'GT Road, Karnal' },
+      { id: 'poi-swarghat-petrol', name: 'IndianOil Swarghat Hub', type: 'petrol', icon: '⛽', latitude: 31.2340, longitude: 76.7180, address: 'NH21 Swarghat, HP' },
+      { id: 'poi-bilaspur-hotel', name: 'Himachal Tourism Hotel', type: 'hotel', icon: '🏨', latitude: 31.3410, longitude: 76.7610, address: 'Bilaspur Lake Road' },
+      { id: 'poi-mandi-petrol', name: 'HP Petrol Pump Mandi', type: 'petrol', icon: '⛽', latitude: 31.7090, longitude: 76.9330, address: 'Mandi Highway By-Pass' },
+      { id: 'poi-kullu-hotel', name: 'River View Resort', type: 'hotel', icon: '🏨', latitude: 31.9590, longitude: 77.1105, address: 'Kullu Valley Highway' },
+      { id: 'poi-manali-petrol', name: 'IndianOil Fuel Station', type: 'petrol', icon: '⛽', latitude: 32.2380, longitude: 77.1870, address: 'Mall Road Approach, Manali' },
+      { id: 'poi-manali-hotel', name: 'Snow Valley Resort', type: 'hotel', icon: '🏨', latitude: 32.2400, longitude: 77.1895, address: 'Mall Road, Manali' }
+    ];
+    return defaultPOIs;
   }
 };
 

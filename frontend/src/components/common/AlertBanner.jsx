@@ -70,6 +70,22 @@ export function AlertBanner() {
             <p className="text-xs sm:text-sm font-bold text-[#202124] leading-snug truncate">
               {activeAlert.message}
             </p>
+            {(activeAlert.nearbyPetrol || activeAlert.nearbyHotel) && (
+              <div className="flex items-center gap-2 mt-1 text-[11px] font-medium text-[#5f6368]">
+                {activeAlert.nearbyPetrol && (
+                  <span className="flex items-center gap-0.5 text-[#202124] bg-[#f1f3f4] px-1.5 py-0.2 rounded-md">
+                    <span>⛽</span>
+                    <span>{activeAlert.nearbyPetrol.name} ({activeAlert.nearbyPetrol.distanceText})</span>
+                  </span>
+                )}
+                {activeAlert.nearbyHotel && (
+                  <span className="flex items-center gap-0.5 text-[#202124] bg-[#f1f3f4] px-1.5 py-0.2 rounded-md">
+                    <span>🏨</span>
+                    <span>{activeAlert.nearbyHotel.name} ({activeAlert.nearbyHotel.distanceText})</span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

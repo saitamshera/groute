@@ -78,6 +78,37 @@ export function StopModal() {
               {isOngoing ? 'Currently Stopped' : formatDuration(selectedStop.duration_seconds)}
             </span>
           </div>
+
+          {/* Nearby POIs */}
+          {(selectedStop.metadata?.nearbyPetrol || selectedStop.metadata?.nearbyHotel) && (
+            <div className="pt-2 border-t border-[#dadce0] space-y-1.5 text-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#5f6368]">
+                Nearby Route Services
+              </span>
+              {selectedStop.metadata?.nearbyPetrol && (
+                <div className="flex items-center justify-between bg-white p-2 rounded-xl border border-[#dadce0]">
+                  <span className="flex items-center gap-1.5 font-medium text-[#202124]">
+                    <span>⛽</span>
+                    <span className="truncate">{selectedStop.metadata.nearbyPetrol.name}</span>
+                  </span>
+                  <span className="font-semibold text-[#1a73e8] shrink-0">
+                    {selectedStop.metadata.nearbyPetrol.distanceText}
+                  </span>
+                </div>
+              )}
+              {selectedStop.metadata?.nearbyHotel && (
+                <div className="flex items-center justify-between bg-white p-2 rounded-xl border border-[#dadce0]">
+                  <span className="flex items-center gap-1.5 font-medium text-[#202124]">
+                    <span>🏨</span>
+                    <span className="truncate">{selectedStop.metadata.nearbyHotel.name}</span>
+                  </span>
+                  <span className="font-semibold text-[#1a73e8] shrink-0">
+                    {selectedStop.metadata.nearbyHotel.distanceText}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* GPS Coordinates */}

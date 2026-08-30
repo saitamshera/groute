@@ -346,6 +346,22 @@ export const tripController = {
     } catch (err) {
       return res.status(500).json({ error: 'Failed to fetch user trips.' });
     }
+  },
+
+  async getTripPOIs(req, res) {
+    try {
+      const { tripId } = req.params;
+      const trip = db.tables.get('trips').find(t => t.id === tripId);
+      if (!trip) {
+        return res.status(404).json({ error: 'Trip not found.' });
+      }
+
+      const pois = await mapService.searchRouteCorridorPOIs();
+      return res.json({ pois });
+    } catch (err) {
+      console.error('[Trip] Get POIs error:', err);
+      return res.status(500).json({ error: 'Failed to fetch trip POIs.' });
+    }
   }
 };
 

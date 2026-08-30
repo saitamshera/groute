@@ -1,22 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
-  Search,
   Clock,
   Play,
   CheckCircle,
   Users,
-  ChevronDown
+  Navigation
 } from 'lucide-react';
 import useTripStore, { selectTravelers } from '../../store/tripStore.js';
 import useAuthStore from '../../store/authStore.js';
-import api from '../../services/api.js';
 
-export function TopTripBar({ onStartTrip, onEndTrip, showSimPanel, setShowSimPanel }) {
+export function TopTripBar({ onStartTrip, onEndTrip }) {
   const {
     trip,
-    group,
     isOwner,
     groupEta,
     members,
@@ -28,12 +25,10 @@ export function TopTripBar({ onStartTrip, onEndTrip, showSimPanel, setShowSimPan
   } = useTripStore();
 
   const { user } = useAuthStore();
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   if (!trip) return null;
 
   const isActive = trip.status === 'ACTIVE';
-
   const travelers = selectTravelers(members, liveLocations, user?.id);
   const stoppedCount = travelers.filter(t => t.status === 'STOPPED' || t.status === 'POSSIBLE_STOP').length;
   const splitCount = travelers.filter(t => t.status === 'SPLIT' || t.status === 'FALLING_BEHIND').length;
@@ -48,175 +43,92 @@ export function TopTripBar({ onStartTrip, onEndTrip, showSimPanel, setShowSimPan
   };
 
   return (
-    <div className="absolute top-4 left-4 right-4 z-30 pointer-events-none flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-      {/* Search & Trip Navigation Bar */}
-      <div className="pointer-events-auto w-full sm:w-auto flex items-center gap-2 bg-white border border-[#dadce0] p-1.5 sm:p-2 rounded-full shadow-md">
+    <div className="absolute top-2.5 sm:top-3 left-2.5 right-2.5 sm:left-4 sm:right-4 z-30 pointer-events-none flex items-center justify-between gap-1.5 sm:gap-2">
+      {/* Sleek Compact Google Maps Navigation Bar */}
+      <div className="pointer-events-auto flex items-center gap-1 sm:gap-2 bg-white/95 backdrop-blur-md border border-[#dadce0] p-1 sm:p-1.5 rounded-full shadow-md hover:shadow-lg transition-all min-w-0 max-w-[calc(100vw-110px)] sm:max-w-xl">
         {/* Back Button */}
         <Link
           to="/dashboard"
           title="Back to Dashboard"
-          className="p-2 rounded-full text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] transition-colors"
+          className="p-1.5 sm:p-2 rounded-full text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] transition-colors shrink-0"
         >
           <ArrowLeft className="w-4 h-4" />
         </Link>
 
-        {/* Route / Search Display */}
-        <button
-          onClick={() => setIsDetailsOpen(!isDetailsOpen)}
-          className="flex items-center gap-2 px-2.5 py-1 rounded-full hover:bg-[#f1f3f4] transition-colors text-left min-w-0"
-        >
-          <div className="p-1.5 rounded-full bg-[#e8f0fe] text-[#1a73e8] shrink-0">
-            <Search className="w-3.5 h-3.5" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-xs sm:text-sm font-bold text-[#202124] truncate">
-                {trip.origin} → {trip.destination}
-              </span>
-              <span
-                className={`px-2 py-0.2 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                  isActive
-                    ? 'bg-[#e6f4ea] text-[#137333] border border-[#ceead6]'
-                    : 'bg-[#f1f3f4] text-[#5f6368] border border-[#dadce0]'
-                }`}
-              >
-                {trip.status}
-              </span>
-            </div>
-            <p className="text-[10px] text-[#5f6368] truncate">
-              {trip.name} · {group?.name || 'Convoy'}
-            </p>
-          </div>
-          <ChevronDown className={`w-3.5 h-3.5 text-[#5f6368] transition-transform ${isDetailsOpen ? 'rotate-180' : ''}`} />
-        </button>
-
-        {/* Clustered Group ETA Pill */}
-        <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#f8f9fa] border border-[#dadce0] text-xs shrink-0">
-          <Clock className="w-3.5 h-3.5 text-[#1a73e8]" />
-          <div className="text-left">
-            <span className="text-[9px] text-[#5f6368] uppercase block font-semibold leading-tight">ETA</span>
-            <span className="font-mono text-xs font-bold text-[#1a73e8] leading-tight">
-              {groupEta?.formattedEta || 'Calculating...'}
-            </span>
-          </div>
+        {/* Route Title & Status */}
+        <div className="flex items-center gap-1 sm:gap-1.5 px-1 sm:px-2 min-w-0">
+          <Navigation className="w-3.5 h-3.5 text-[#1a73e8] shrink-0 transform -rotate-45 hidden xs:block" />
+          <span className="text-xs sm:text-sm font-bold text-[#202124] truncate leading-tight">
+            {trip.origin} → {trip.destination}
+          </span>
+          <span
+            className={`hidden sm:inline-flex px-2 py-0.2 rounded-full text-[9px] font-extrabold uppercase shrink-0 ${
+              isActive
+                ? 'bg-[#e6f4ea] text-[#137333] border border-[#ceead6]'
+                : 'bg-[#f1f3f4] text-[#5f6368] border border-[#dadce0]'
+            }`}
+          >
+            {isActive ? '● Live' : trip.status}
+          </span>
         </div>
 
-        {/* Owner Quick Action */}
-        {isOwner && (
-          <div className="hidden sm:flex items-center gap-1 shrink-0 pl-1 border-l border-[#e0e3e7]">
-            {trip.status === 'PLANNED' && (
-              <button
-                onClick={onStartTrip}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1e8e3e] hover:bg-[#137333] text-white font-bold text-xs shadow-sm transition-all"
-              >
-                <Play className="w-3.5 h-3.5" />
-                <span>Start Trip</span>
-              </button>
-            )}
+        {/* Clustered Group ETA */}
+        <div className="hidden md:flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#f8f9fa] border border-[#dadce0] text-xs shrink-0">
+          <Clock className="w-3 h-3 text-[#1a73e8]" />
+          <span className="font-mono font-bold text-[#1a73e8] text-[11px]">
+            {groupEta?.formattedEta || 'Calculating...'}
+          </span>
+        </div>
 
-            {isActive && (
-              <button
-                onClick={onEndTrip}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white hover:bg-[#fce8e6] text-[#d93025] font-bold text-xs border border-[#dadce0] hover:border-[#d93025] transition-colors"
-              >
-                <CheckCircle className="w-3.5 h-3.5" />
-                <span>Complete</span>
-              </button>
-            )}
-          </div>
+        {/* Owner Action Buttons */}
+        {isOwner && trip.status === 'PLANNED' && (
+          <button
+            onClick={onStartTrip}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#1e8e3e] hover:bg-[#137333] text-white font-bold text-xs shadow-xs transition-colors shrink-0"
+          >
+            <Play className="w-3 h-3" />
+            <span className="hidden sm:inline">Start</span>
+          </button>
+        )}
+
+        {isOwner && isActive && (
+          <button
+            onClick={onEndTrip}
+            className="flex items-center gap-1 px-2 py-1 rounded-full bg-white hover:bg-[#fce8e6] text-[#d93025] font-bold text-xs border border-[#dadce0] hover:border-[#d93025] transition-colors shrink-0"
+          >
+            <CheckCircle className="w-3 h-3" />
+            <span className="hidden sm:inline">End</span>
+          </button>
         )}
       </div>
 
       {/* Convoy Travelers Quick Trigger Pill (Top-Right) */}
-      <div className="pointer-events-auto flex items-center gap-2">
+      <div className="pointer-events-auto shrink-0">
         <button
           onClick={() => handleToggleDrawer('MEMBERS')}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-full border shadow-md transition-all text-xs font-bold ${
+          className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-full border shadow-md transition-all text-xs font-bold shrink-0 ${
             isDrawerOpen && activeDrawerTab === 'MEMBERS'
-              ? 'bg-[#1a73e8] text-white border-[#1a73e8] shadow-md'
-              : 'bg-white text-[#202124] border-[#dadce0] hover:bg-[#f8f9fa]'
+              ? 'bg-[#1a73e8] text-white border-[#1a73e8]'
+              : 'bg-white/95 backdrop-blur-md text-[#202124] border-[#dadce0] hover:bg-[#f8f9fa]'
           }`}
         >
-          <Users className="w-4 h-4 text-[#1a73e8]" />
-          <span>{members.length} Travelers</span>
+          <Users className="w-3.5 h-3.5" />
+          <span>{travelers.length}</span>
+          <span className="hidden sm:inline">Travelers</span>
 
-          {/* Micro status notification bubbles */}
+          {/* Micro status alerts */}
           {stoppedCount > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-[#d93025] text-white text-[10px] font-bold">
+            <span className="px-1.5 py-0.2 rounded-full bg-[#d93025] text-white text-[9px] font-bold">
               {stoppedCount} 🛑
             </span>
           )}
           {splitCount > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-[#f9ab00] text-[#202124] text-[10px] font-bold">
+            <span className="px-1.5 py-0.2 rounded-full bg-[#f9ab00] text-[#202124] text-[9px] font-bold">
               {splitCount} ⚠
             </span>
           )}
         </button>
       </div>
-
-      {/* Trip Details Dropdown Card */}
-      {isDetailsOpen && (
-        <div className="pointer-events-auto absolute top-16 left-0 w-full sm:w-96 bg-white border border-[#dadce0] p-4 rounded-3xl shadow-xl animate-in fade-in slide-in-from-top-2 duration-150 text-xs space-y-3 z-40">
-          <div className="flex items-center justify-between pb-2 border-b border-[#f1f3f4]">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#1a73e8]">Trip Overview</span>
-              <h4 className="text-sm font-bold text-[#202124]">{trip.name}</h4>
-            </div>
-            <button
-              onClick={() => setIsDetailsOpen(false)}
-              className="text-[#5f6368] hover:text-[#202124] font-bold"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="space-y-2 text-[#3c4043]">
-            <div className="flex items-center justify-between">
-              <span className="text-[#5f6368]">Origin:</span>
-              <span className="font-semibold text-[#202124]">{trip.origin}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[#5f6368]">Destination:</span>
-              <span className="font-semibold text-[#202124]">{trip.destination}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[#5f6368]">Estimated Distance:</span>
-              <span className="font-mono font-semibold">{trip.distance || '535 km'}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[#5f6368]">Group ETA:</span>
-              <span className="font-mono font-bold text-[#1a73e8]">
-                {groupEta?.formattedEta || 'Calculating...'}
-              </span>
-            </div>
-          </div>
-
-          {/* Owner Buttons for mobile */}
-          {isOwner && (
-            <div className="pt-2 border-t border-[#f1f3f4] flex gap-2">
-              {trip.status === 'PLANNED' && (
-                <button
-                  onClick={onStartTrip}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#1e8e3e] hover:bg-[#137333] text-white font-bold text-xs shadow-sm transition-colors"
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  <span>Start Live Trip</span>
-                </button>
-              )}
-
-              {isActive && (
-                <button
-                  onClick={onEndTrip}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-white hover:bg-[#fce8e6] text-[#d93025] border border-[#dadce0] font-bold text-xs shadow-sm transition-colors"
-                >
-                  <CheckCircle className="w-3.5 h-3.5" />
-                  <span>Complete Trip</span>
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

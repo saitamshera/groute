@@ -4,10 +4,12 @@ import { getSocket } from '../services/socket.js';
 
 /**
  * Universal Selector: Merges database group members and real-time live reporting travelers
- * into a deduplicated, rich, intelligently sorted traveler array.
+ * into a deduplicated, rich, intelligently sorted traveler array with Convoy Intelligence.
+ * Evaluates: Leader, Arrived, Long Stop, Behind, Speed, Distance, and Progress.
  */
-export function selectTravelers(members = [], liveLocations = {}, currentUserId = null) {
+export function selectTravelers(members = [], liveLocations = {}, currentUserId = null, tripDestination = null) {
   const memberMap = new Map();
+  const currentUserName = members.find(m => m.id === currentUserId)?.name?.toLowerCase() || '';
 
   // 1. Ingest database registered group members
   (members || []).forEach((m) => {
@@ -23,27 +25,45 @@ export function selectTravelers(members = [], liveLocations = {}, currentUserId 
     }
   });
 
-  // 2. Ingest/Merge live reporting members from Redis/Socket.IO
+  // 2. Ingest/Merge live reporting members from Redis/Socket.IO with alias resolution
   Object.values(liveLocations || {}).forEach((loc) => {
-    if (loc && (loc.userId || loc.id)) {
-      const id = loc.userId || loc.id;
-      const existing = memberMap.get(id) || {};
-      memberMap.set(id, {
-        ...existing,
-        id,
-        name: loc.userName || existing.name || 'Traveler',
-        profile_image: loc.userImage || existing.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${loc.userName || id}`,
-        role: existing.role || 'MEMBER',
-        location_sharing: loc.locationSharing !== false
-      });
+    if (!loc || (!loc.userId && !loc.id)) return;
+    const rawId = loc.userId || loc.id;
+    const rawName = (loc.userName || '').toLowerCase();
+
+    // Check if this simulated record is an alias for the current logged-in user
+    let targetId = rawId;
+    if (currentUserId && (rawId === currentUserId || (rawId.startsWith('sim-') && currentUserName && (rawName === currentUserName || currentUserName.includes(rawName))))) {
+      targetId = currentUserId;
     }
+
+    const existing = memberMap.get(targetId) || {};
+    memberMap.set(targetId, {
+      ...existing,
+      id: targetId,
+      name: (targetId === currentUserId && existing.name) ? existing.name : (loc.userName || existing.name || 'Traveler'),
+      profile_image: (targetId === currentUserId && existing.profile_image) ? existing.profile_image : (loc.userImage || existing.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${loc.userName || targetId}`),
+      role: existing.role || 'MEMBER',
+      location_sharing: loc.locationSharing !== false
+    });
   });
 
   const now = Date.now();
 
   // 3. Compile full traveler intelligence state
-  const travelers = Array.from(memberMap.values()).map((traveler) => {
-    const loc = (liveLocations && liveLocations[traveler.id]) || {};
+  const rawTravelers = Array.from(memberMap.values()).map((traveler) => {
+    // Find location telemetry (check direct ID or aliased simulated ID)
+    let loc = (liveLocations && liveLocations[traveler.id]) || null;
+    if (!loc && traveler.id === currentUserId) {
+      const simAlias = Object.values(liveLocations || {}).find(l => {
+        if (!l) return false;
+        const lName = (l.userName || '').toLowerCase();
+        return l.userId?.startsWith('sim-') && currentUserName && (lName === currentUserName || currentUserName.includes(lName));
+      });
+      if (simAlias) loc = simAlias;
+    }
+    loc = loc || {};
+
     const isMe = traveler.id === currentUserId;
     const isSharingOff = traveler.location_sharing === false || loc.locationSharing === false || loc.status === 'LOCATION_OFF';
 
@@ -56,26 +76,42 @@ export function selectTravelers(members = [], liveLocations = {}, currentUserId 
     let status = 'OFFLINE';
     if (isSharingOff) {
       status = 'LOCATION_OFF';
+    } else if (loc.status === 'ARRIVED') {
+      status = 'ARRIVED';
     } else if (isStale) {
       status = 'STALE';
     } else if (loc.status) {
-      status = loc.status; // 'MOVING' | 'POSSIBLE_STOP' | 'STOPPED' | 'SPLIT' | 'REJOINED'
+      status = loc.status; // 'MOVING' | 'POSSIBLE_STOP' | 'STOPPED' | 'SPLIT' | 'REJOINED' | 'ARRIVED'
     } else if (loc.latitude && loc.longitude) {
       status = (loc.speed && loc.speed > 3) ? 'MOVING' : 'STOPPED';
     }
 
     // Stop duration calculation
     let stopDurationText = null;
+    let isLongStop = loc.isLongStop || false;
+    let stopDurationMinutes = 0;
+
     if (status === 'STOPPED' || status === 'POSSIBLE_STOP') {
       if (loc.stoppedSince) {
         const stopStartMs = new Date(loc.stoppedSince).getTime();
         const stoppedSec = Math.max(0, Math.round((now - stopStartMs) / 1000));
-        const stopMin = Math.round(stoppedSec / 60);
-        stopDurationText = stopMin < 1 ? 'Just stopped' : `${stopMin} min`;
+        stopDurationMinutes = Math.round(stoppedSec / 60);
+        stopDurationText = stopDurationMinutes < 1 ? 'Just stopped' : `${stopDurationMinutes} min`;
       } else if (loc.stopDurationSeconds) {
-        const stopMin = Math.round(loc.stopDurationSeconds / 60);
-        stopDurationText = stopMin < 1 ? 'Just stopped' : `${stopMin} min`;
+        stopDurationMinutes = Math.round(loc.stopDurationSeconds / 60);
+        stopDurationText = stopDurationMinutes < 1 ? 'Just stopped' : `${stopDurationMinutes} min`;
       }
+
+      if (stopDurationMinutes >= 10) {
+        isLongStop = true;
+      }
+    }
+
+    // Arrival formatted time
+    let arrivedAtTimeText = null;
+    if (status === 'ARRIVED' && loc.arrivedAt) {
+      const arrivedDate = new Date(loc.arrivedAt);
+      arrivedAtTimeText = arrivedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
     // Best Location Name (City / Highway / Landmark)
@@ -84,21 +120,36 @@ export function selectTravelers(members = [], liveLocations = {}, currentUserId 
       locationName = `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`;
     }
 
+    // Route progress
+    const routeProgress = loc.routeProgress !== undefined ? loc.routeProgress : 0;
+    const distanceToDestinationKm = loc.distanceToDestinationKm !== undefined ? loc.distanceToDestinationKm : null;
+
     return {
       ...traveler,
       isMe,
       status,
-      speed: (status === 'STOPPED' || status === 'POSSIBLE_STOP') ? 0 : (loc.speed !== undefined ? loc.speed : null),
+      speed: (status === 'STOPPED' || status === 'POSSIBLE_STOP' || status === 'ARRIVED') ? 0 : (loc.speed !== undefined ? loc.speed : null),
       heading: loc.heading || 0,
       latitude: loc.latitude || null,
       longitude: loc.longitude || null,
       accuracy: loc.accuracy || null,
       distanceFromGroupKm: loc.distanceFromGroupKm !== undefined ? loc.distanceFromGroupKm : null,
-      eta: loc.eta || null,
-      locationName: locationName || (isSharingOff ? 'Location sharing off' : 'Location unavailable'),
+      eta: status === 'ARRIVED' ? 'Arrived' : (loc.eta || null),
+      locationName: status === 'ARRIVED'
+        ? (tripDestination || locationName || 'Destination Point')
+        : (locationName || (isSharingOff ? 'Location sharing off' : 'Location unavailable')),
       stoppedLocationName: loc.stoppedLocationName || null,
       stoppedSince: loc.stoppedSince || null,
       stopDurationText,
+      stopDurationMinutes,
+      isLongStop,
+      nearbyPetrol: loc.nearbyPetrol || null,
+      nearbyHotel: loc.nearbyHotel || null,
+      arrivedAt: loc.arrivedAt || null,
+      arrivedAtTimeText,
+      routeProgress,
+      distanceToDestinationKm,
+      isLeader: false, // Calculated in pass below
       lastSeen: timestamp,
       ageSeconds,
       isStale,
@@ -106,21 +157,53 @@ export function selectTravelers(members = [], liveLocations = {}, currentUserId 
     };
   });
 
-  // 4. Intelligent Sorting: Current User -> Split/Behind -> Stopped -> Moving -> Offline
-  return travelers.sort((a, b) => {
-    if (a.isMe && !b.isMe) return -1;
-    if (!a.isMe && b.isMe) return 1;
+  // 4. Determine Leader among active non-arrived travelers based on route progress
+  const activeTraveling = rawTravelers.filter(t => t.status !== 'ARRIVED' && t.latitude && t.longitude && !t.isSharingOff);
+  let leaderId = null;
+  let maxProgress = -1;
 
-    const rank = (s) => {
-      if (s === 'SPLIT' || s === 'FALLING_BEHIND') return 1;
-      if (s === 'STOPPED' || s === 'POSSIBLE_STOP') return 2;
-      if (s === 'MOVING' || s === 'REJOINED') return 3;
-      if (s === 'STALE') return 4;
-      return 5;
+  if (activeTraveling.length > 0) {
+    for (const t of activeTraveling) {
+      const prog = t.routeProgress !== undefined ? t.routeProgress : (1000 - (t.distanceToDestinationKm || 1000));
+      if (prog > maxProgress) {
+        maxProgress = prog;
+        leaderId = t.id;
+      }
+    }
+  }
+
+  const travelers = rawTravelers.map(t => {
+    const isLeader = t.id === leaderId && t.status !== 'ARRIVED';
+    let convoyRole = 'MAIN_CONVOY';
+    if (t.status === 'ARRIVED') convoyRole = 'ARRIVED';
+    else if (isLeader) convoyRole = 'LEADER';
+    else if (t.status === 'SPLIT' || t.status === 'FALLING_BEHIND') convoyRole = 'BEHIND';
+    else if (t.status === 'STOPPED' || t.status === 'POSSIBLE_STOP') convoyRole = 'STOPPED';
+
+    return {
+      ...t,
+      isLeader,
+      convoyRole
+    };
+  });
+
+  // 5. Intelligent Convoy Hierarchy Sorting:
+  // 1. Leader -> 2. Arrived -> 3. Behind -> 4. Stopped -> 5. Moving -> 6. Offline
+  return travelers.sort((a, b) => {
+    if (a.isLeader && !b.isLeader) return -1;
+    if (!a.isLeader && b.isLeader) return 1;
+
+    const roleRank = (role) => {
+      if (role === 'LEADER') return 1;
+      if (role === 'ARRIVED') return 2;
+      if (role === 'BEHIND') return 3;
+      if (role === 'STOPPED') return 4;
+      if (role === 'MAIN_CONVOY') return 5;
+      return 6;
     };
 
-    const rankA = rank(a.status);
-    const rankB = rank(b.status);
+    const rankA = roleRank(a.convoyRole);
+    const rankB = roleRank(b.convoyRole);
     if (rankA !== rankB) return rankA - rankB;
 
     return a.name.localeCompare(b.name);
@@ -134,6 +217,7 @@ export const useTripStore = create((set, get) => ({
   members: [],
   liveLocations: {},
   stops: [],
+  pois: [],
   events: [],
   groupCenter: null,
   groupEta: { formattedEta: 'Calculating...', totalMinutes: 0 },
@@ -141,6 +225,7 @@ export const useTripStore = create((set, get) => ({
   // UI & Interaction states
   selectedMemberId: null,
   selectedStop: null,
+  selectedPOI: null,
   activeAlert: null,
   isSharingLocation: true,
   isLoadingTrip: true,
@@ -148,7 +233,7 @@ export const useTripStore = create((set, get) => ({
 
   // Map camera focus & coordination state
   mapFocus: null, // { lat, lng, zoom, fitGroup, targetId, timestamp }
-  layerVisibility: { route: true, stops: true, members: true },
+  layerVisibility: { route: true, stops: true, members: true, petrol: true, hotels: true },
   isDrawerOpen: true,
   activeDrawerTab: 'MEMBERS', // 'MEMBERS' | 'TIMELINE'
 
@@ -161,7 +246,11 @@ export const useTripStore = create((set, get) => ({
   fetchTripDetails: async (tripId) => {
     set({ isLoadingTrip: true });
     try {
-      const data = await api.getTripDetails(tripId);
+      const [data, poisRes] = await Promise.all([
+        api.getTripDetails(tripId),
+        api.getTripPOIs ? api.getTripPOIs(tripId).catch(() => ({ pois: [] })) : Promise.resolve({ pois: [] })
+      ]);
+
       set({
         trip: data.trip,
         group: data.group,
@@ -169,6 +258,7 @@ export const useTripStore = create((set, get) => ({
         members: data.members || [],
         liveLocations: data.liveLocations || {},
         stops: data.stops || [],
+        pois: (poisRes && Array.isArray(poisRes.pois)) ? poisRes.pois : [],
         events: data.events || [],
         isLoadingTrip: false
       });
@@ -184,7 +274,7 @@ export const useTripStore = create((set, get) => ({
 
   setLiveLocations: (locations) => {
     set((state) => {
-      // Auto-sync members with any incoming reporting traveler
+      // Upsert into members array without duplicates
       const newMembers = [...state.members];
       Object.values(locations || {}).forEach((loc) => {
         if (loc && (loc.userId || loc.id)) {
@@ -216,7 +306,7 @@ export const useTripStore = create((set, get) => ({
       const userId = location.userId || location.id;
       if (!userId) return state;
 
-      // Auto-sync members array
+      // Upsert into members array without duplicates
       const newMembers = [...state.members];
       const memberIndex = newMembers.findIndex((m) => m.id === userId);
       if (memberIndex === -1) {
@@ -229,10 +319,10 @@ export const useTripStore = create((set, get) => ({
           location_sharing: location.locationSharing !== false,
           joined_at: new Date().toISOString()
         });
-      } else if (location.userName) {
+      } else if (location.userName && !newMembers[memberIndex].name) {
         newMembers[memberIndex] = {
           ...newMembers[memberIndex],
-          name: location.userName || newMembers[memberIndex].name,
+          name: location.userName,
           profile_image: location.userImage || newMembers[memberIndex].profile_image
         };
       }
@@ -260,11 +350,24 @@ export const useTripStore = create((set, get) => ({
       if (event.event_type === 'MEMBER_FELL_BEHIND' || event.event_type === 'GROUP_SPLIT') {
         alert = {
           type: 'warning',
-          title: 'Separation Alert',
+          title: 'Convoy Separation Alert',
           message: event.metadata?.message || `${event.user_name} is falling behind the convoy!`,
           targetUserId: event.user_id,
           userName: event.user_name,
           actionLabel: `View ${event.user_name}`,
+          timestamp: Date.now()
+        };
+      } else if (event.event_type === 'LONG_STOP') {
+        alert = {
+          type: 'danger',
+          title: 'Stationary Stop (10+ min)',
+          message: event.metadata?.message || `${event.user_name} has stopped for 10 min!`,
+          targetUserId: event.user_id,
+          userName: event.user_name,
+          locationName: event.location_name,
+          nearbyPetrol: event.metadata?.nearbyPetrol,
+          nearbyHotel: event.metadata?.nearbyHotel,
+          actionLabel: 'View Stop',
           timestamp: Date.now()
         };
       } else if (event.event_type === 'STOP_STARTED') {
@@ -277,6 +380,24 @@ export const useTripStore = create((set, get) => ({
           userName: event.user_name,
           locationName: event.location_name,
           actionLabel: 'View Stop',
+          timestamp: Date.now()
+        };
+      } else if (event.event_type === 'MEMBER_ARRIVED') {
+        alert = {
+          type: 'success',
+          title: 'Destination Reached',
+          message: event.metadata?.message || `${event.user_name} has arrived at destination!`,
+          targetUserId: event.user_id,
+          userName: event.user_name,
+          actionLabel: `View ${event.user_name}`,
+          timestamp: Date.now()
+        };
+      } else if (event.event_type === 'ALL_MEMBERS_ARRIVED') {
+        alert = {
+          type: 'success',
+          title: 'Everyone Has Arrived!',
+          message: event.metadata?.message || `All travelers have reached destination!`,
+          actionLabel: 'View Group',
           timestamp: Date.now()
         };
       } else if (event.event_type === 'MEMBER_REJOINED') {
@@ -330,6 +451,10 @@ export const useTripStore = create((set, get) => ({
   setSelectedMemberId: (id) => set({ selectedMemberId: id }),
 
   setSelectedStop: (stop) => set({ selectedStop: stop }),
+
+  setSelectedPOI: (poi) => set({ selectedPOI: poi }),
+
+  setPOIs: (pois) => set({ pois: Array.isArray(pois) ? pois : [] }),
 
   clearActiveAlert: () => set({ activeAlert: null }),
 
@@ -418,11 +543,13 @@ export const useTripStore = create((set, get) => ({
     members: [],
     liveLocations: {},
     stops: [],
+    pois: [],
     events: [],
     groupCenter: null,
     groupEta: { formattedEta: 'Calculating...', totalMinutes: 0 },
     selectedMemberId: null,
     selectedStop: null,
+    selectedPOI: null,
     activeAlert: null,
     mapFocus: null,
     isSimulationActive: false

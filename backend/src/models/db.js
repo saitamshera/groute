@@ -1,4 +1,4 @@
-import pg from 'pg';
+import { MongoClient } from 'mongodb';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,13 +7,23 @@ import { v4 as uuidv4 } from 'uuid';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const { Pool } = pg;
-
-let pool = null;
-let useLocalFallback = process.env.USE_LOCAL_STORAGE_FALLBACK !== 'false';
+let mongoClient = null;
+let mongoDb = null;
+let isMongoConnected = false;
 const localDbPath = path.resolve(__dirname, '../../data/local_db.json');
 
-// In-Memory / File-backed robust store schema
+// Standard collections required by GroupRoute
+const COLLECTION_NAMES = [
+  'users',
+  'groups',
+  'group_members',
+  'trips',
+  'trip_members',
+  'locations',
+  'stops',
+  'trip_events'
+];
+
 const initialLocalDb = {
   users: [],
   groups: [],
@@ -61,113 +71,163 @@ function saveLocalDb() {
   }
 }
 
-// Initialize Database connection
+// Initialize Database connection (MongoDB primary, embedded local sync)
 export async function initDb() {
-  if (process.env.DATABASE_URL && process.env.DATABASE_URL !== '') {
+  const mongoUri = process.env.MONGODB_URI;
+
+  if (mongoUri && mongoUri.trim().length > 0) {
     try {
-      pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        connectionTimeoutMillis: 3000
+      console.log('[DB] Connecting to MongoDB cluster...');
+      mongoClient = new MongoClient(mongoUri, {
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 10000
       });
-      const client = await pool.connect();
-      console.log('[DB] Connected successfully to PostgreSQL database.');
-      
-      // Run migrations
-      const schemaSqlPath = path.resolve(__dirname, 'schema.sql');
-      if (fs.existsSync(schemaSqlPath)) {
-        const schemaSql = fs.readFileSync(schemaSqlPath, 'utf8');
-        await client.query(schemaSql);
-        console.log('[DB] PostgreSQL schema & migrations applied.');
+
+      await mongoClient.connect();
+      mongoDb = mongoClient.db('grouproute');
+      isMongoConnected = true;
+      console.log('[DB] ✅ Connected successfully to MongoDB database (database: grouproute).');
+
+      // Create collections & indexes if needed
+      for (const colName of COLLECTION_NAMES) {
+        const col = mongoDb.collection(colName);
+        if (colName === 'users') {
+          await col.createIndex({ email: 1 }, { unique: true, sparse: true }).catch(() => {});
+        } else if (colName === 'groups') {
+          await col.createIndex({ invite_code: 1 }, { unique: true, sparse: true }).catch(() => {});
+        } else if (colName === 'group_members') {
+          await col.createIndex({ group_id: 1, user_id: 1 }).catch(() => {});
+        } else if (colName === 'trips') {
+          await col.createIndex({ group_id: 1 }).catch(() => {});
+        } else if (colName === 'trip_events') {
+          await col.createIndex({ trip_id: 1, created_at: -1 }).catch(() => {});
+        }
       }
-      client.release();
-      useLocalFallback = false;
+
+      // Hydrate local cache from MongoDB
+      localDbCache = { ...initialLocalDb };
+      for (const colName of COLLECTION_NAMES) {
+        const docs = await mongoDb.collection(colName).find({}).toArray();
+        localDbCache[colName] = docs.map(doc => {
+          const { _id, ...rest } = doc;
+          return { id: rest.id || _id.toString(), ...rest };
+        });
+      }
+
+      // If MongoDB was empty but local file had data, seed MongoDB from localDb
+      const userCount = localDbCache.users.length;
+      if (userCount === 0) {
+        const existingLocal = loadLocalDb();
+        let seededAny = false;
+        for (const colName of COLLECTION_NAMES) {
+          const localItems = existingLocal[colName] || [];
+          if (localItems.length > 0) {
+            await mongoDb.collection(colName).insertMany(localItems.map(item => ({ ...item }))).catch(() => {});
+            localDbCache[colName] = [...localItems];
+            seededAny = true;
+          }
+        }
+        if (seededAny) {
+          console.log('[DB] Synchronized initial local records into MongoDB.');
+        }
+      } else {
+        saveLocalDb();
+      }
+
       return;
     } catch (err) {
-      console.warn(`[DB] PostgreSQL connection failed (${err.message}). Activating robust embedded local data store.`);
-      useLocalFallback = true;
+      console.warn(`[DB] ⚠️ MongoDB connection failed (${err.message}). Activating robust local data store fallback.`);
+      isMongoConnected = false;
     }
   }
-  
+
   loadLocalDb();
   console.log('[DB] Local embedded storage engine active & initialized.');
 }
 
-// Local SQL parser/executor emulator for full relational emulation
+// Database helper object
 export const db = {
-  isLocal: () => useLocalFallback,
-  
-  async query(text, params = []) {
-    if (!useLocalFallback && pool) {
-      return pool.query(text, params);
-    }
-    return executeLocalQuery(text, params);
-  },
+  isMongo: () => isMongoConnected,
+  getMongoDb: () => mongoDb,
+  getMongoClient: () => mongoClient,
 
-  // Direct table helpers for clean, bulletproof programmatic access
+  // Direct table/collection helpers for unified sync access
   tables: {
     get: (tableName) => {
       const dbData = loadLocalDb();
       return dbData[tableName] || [];
     },
+
     insert: (tableName, record) => {
       const dbData = loadLocalDb();
       if (!dbData[tableName]) dbData[tableName] = [];
       const newRecord = {
         id: record.id || uuidv4(),
-        created_at: new Date().toISOString(),
+        created_at: record.created_at || new Date().toISOString(),
         ...record
       };
+
       dbData[tableName].push(newRecord);
       saveLocalDb();
+
+      // Async write to MongoDB
+      if (isMongoConnected && mongoDb) {
+        mongoDb.collection(tableName).insertOne({ ...newRecord }).catch(err => {
+          console.error(`[DB] MongoDB insert error in ${tableName}:`, err.message);
+        });
+      }
+
       return newRecord;
     },
+
     update: (tableName, filterFn, updateValues) => {
       const dbData = loadLocalDb();
       if (!dbData[tableName]) return null;
       const index = dbData[tableName].findIndex(filterFn);
       if (index !== -1) {
-        dbData[tableName][index] = {
-          ...dbData[tableName][index],
+        const existing = dbData[tableName][index];
+        const updated = {
+          ...existing,
           ...updateValues,
           updated_at: new Date().toISOString()
         };
+        dbData[tableName][index] = updated;
         saveLocalDb();
-        return dbData[tableName][index];
+
+        // Async update in MongoDB
+        if (isMongoConnected && mongoDb) {
+          mongoDb.collection(tableName).updateOne(
+            { id: existing.id },
+            { $set: { ...updateValues, updated_at: updated.updated_at } }
+          ).catch(err => {
+            console.error(`[DB] MongoDB update error in ${tableName}:`, err.message);
+          });
+        }
+
+        return updated;
       }
       return null;
     },
+
     delete: (tableName, filterFn) => {
       const dbData = loadLocalDb();
       if (!dbData[tableName]) return false;
+      const toDelete = dbData[tableName].filter(filterFn);
       const initialLen = dbData[tableName].length;
       dbData[tableName] = dbData[tableName].filter(item => !filterFn(item));
       saveLocalDb();
+
+      // Async delete from MongoDB
+      if (isMongoConnected && mongoDb && toDelete.length > 0) {
+        const ids = toDelete.map(d => d.id);
+        mongoDb.collection(tableName).deleteMany({ id: { $in: ids } }).catch(err => {
+          console.error(`[DB] MongoDB delete error in ${tableName}:`, err.message);
+        });
+      }
+
       return dbData[tableName].length < initialLen;
     }
   }
 };
-
-// Emulate simple parameterized SQL for standard compatibility
-function executeLocalQuery(sql, params = []) {
-  const dbData = loadLocalDb();
-  const trimmed = sql.trim().toLowerCase();
-
-  // Basic mock response wrapper
-  const result = { rows: [], rowCount: 0 };
-
-  if (trimmed.startsWith('select')) {
-    // Determine table
-    for (const table of Object.keys(dbData)) {
-      if (sql.toLowerCase().includes(`from ${table}`)) {
-        let rows = [...dbData[table]];
-        result.rows = rows;
-        result.rowCount = rows.length;
-        break;
-      }
-    }
-  }
-
-  return Promise.resolve(result);
-}
 
 export default db;

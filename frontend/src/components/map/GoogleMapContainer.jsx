@@ -31,7 +31,7 @@ const googleMapsLightStyle = [
   { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#185abc' }] }
 ];
 
-export function GoogleMapContainer() {
+export function GoogleMapContainer(props = {}) {
   const rawKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
   const hasValidKeyFormat = Boolean(rawKey && rawKey.trim().length > 10 && !rawKey.startsWith('your_'));
   
@@ -43,6 +43,9 @@ export function GoogleMapContainer() {
     members,
     liveLocations,
     stops,
+    pois: storePOIs,
+    selectedPOI,
+    setSelectedPOI,
     groupCenter,
     selectedMemberId,
     setSelectedMemberId,
@@ -50,6 +53,9 @@ export function GoogleMapContainer() {
     mapFocus,
     layerVisibility
   } = useTripStore();
+
+  const rawPois = props?.pois !== undefined ? props.pois : storePOIs;
+  const pois = Array.isArray(rawPois) ? rawPois : [];
 
   const { user: currentUser } = useAuthStore();
   const travelers = selectTravelers(members, liveLocations, currentUser?.id);
@@ -167,7 +173,7 @@ export function GoogleMapContainer() {
     return (
       <div className="relative w-full h-full">
         {/* Render Canvas Visualizer so map is functional */}
-        <CanvasMapVisualizer />
+        <CanvasMapVisualizer pois={pois} />
 
         {/* Honest, Clear Google Maps Status Alert */}
         <div className="absolute top-20 left-4 right-4 sm:right-auto sm:max-w-md z-20 bg-white/95 backdrop-blur-md p-4 rounded-3xl border border-[#dadce0] shadow-xl space-y-2.5">
@@ -273,12 +279,34 @@ export function GoogleMapContainer() {
           />
         ))}
 
+        {/* POI Markers: Petrol Stations ⛽ */}
+        {layerVisibility?.petrol && (pois || []).filter(p => p.type === 'petrol').map((poi) => (
+          <Marker
+            key={poi.id}
+            position={{ lat: Number(poi.latitude), lng: Number(poi.longitude) }}
+            onClick={() => setSelectedPOI(poi)}
+            title={`⛽ ${poi.name}`}
+          />
+        ))}
+
+        {/* POI Markers: Hotels 🏨 */}
+        {layerVisibility?.hotels && (pois || []).filter(p => p.type === 'hotel').map((poi) => (
+          <Marker
+            key={poi.id}
+            position={{ lat: Number(poi.latitude), lng: Number(poi.longitude) }}
+            onClick={() => setSelectedPOI(poi)}
+            title={`🏨 ${poi.name}`}
+          />
+        ))}
+
         {/* Member Markers & Split Connectors (Every active reporting traveler) */}
         {layerVisibility?.members && travelers.map((t) => {
           if (!t.latitude || !t.longitude || t.isSharingOff || t.status === 'OFFLINE') return null;
           const isSelected = selectedMemberId === t.id;
           const isStopped = t.status === 'STOPPED' || t.status === 'POSSIBLE_STOP';
           const isSplit = t.status === 'SPLIT' || t.status === 'FALLING_BEHIND';
+          const isLeader = t.isLeader;
+          const isArrived = t.status === 'ARRIVED';
 
           return (
             <React.Fragment key={t.id}>
@@ -299,8 +327,8 @@ export function GoogleMapContainer() {
 
               <Marker
                 position={{ lat: Number(t.latitude), lng: Number(t.longitude) }}
-                onClick={() => setSelectedMemberId(t.id)}
-                title={`${t.name} (${t.status})`}
+                onClick={() => setSelectedMemberId(isSelected ? null : t.id)}
+                title={`${isLeader ? '👑 LEADER: ' : ''}${t.name} (${isArrived ? 'Arrived' : t.status})`}
               />
             </React.Fragment>
           );
@@ -310,11 +338,144 @@ export function GoogleMapContainer() {
       {/* Switch to Vector Visualizer Button */}
       <button
         onClick={() => setUseVisualizer(true)}
-        className="absolute top-20 left-4 z-20 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white text-[#202124] text-xs font-bold shadow-md border border-[#dadce0] hover:bg-[#f8f9fa] transition-all"
+        className="absolute top-20 left-4 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md text-[#202124] text-xs font-bold shadow-md border border-[#dadce0] hover:bg-[#f8f9fa] transition-all"
       >
         <Layers className="w-3.5 h-3.5 text-[#1a73e8]" />
         <span>Switch to Vector Visualizer</span>
       </button>
+
+      {/* PROGRESSIVE DISCLOSURE: FLOATING SELECTED TRAVELER CARD */}
+      {selectedMemberId && (() => {
+        const sel = travelers.find(t => t.id === selectedMemberId);
+        if (!sel) return null;
+
+        const isStopped = sel.status === 'STOPPED' || sel.status === 'POSSIBLE_STOP';
+        const isSplit = sel.status === 'SPLIT' || sel.status === 'FALLING_BEHIND';
+        const isArrived = sel.status === 'ARRIVED';
+        const isLeader = sel.isLeader;
+
+        return (
+          <div className="absolute bottom-22 sm:bottom-6 left-3 sm:left-4 z-40 max-w-[calc(100vw-24px)] sm:max-w-xs w-full bg-white/95 backdrop-blur-md border border-[#dadce0] p-3 rounded-3xl shadow-xl space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-auto text-xs">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <img
+                  src={sel.profile_image}
+                  alt={sel.name}
+                  className="w-9 h-9 rounded-full bg-[#f1f3f4] border border-[#dadce0] object-cover"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h4 className="text-xs font-bold text-[#202124] truncate">{sel.name}</h4>
+                    {isLeader && (
+                      <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-[#fef7e0] text-[#b06000] border border-[#feefc3]">
+                        👑 LEADER
+                      </span>
+                    )}
+                    {sel.isMe && (
+                      <span className="text-[8px] font-extrabold uppercase px-1.5 py-0.2 rounded-full bg-[#1a73e8] text-white">
+                        YOU
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#5f6368] truncate font-medium">
+                    {sel.locationName}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedMemberId(null)}
+                className="p-1 text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] rounded-full text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Status & Metrics Bar */}
+            <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-[#f1f3f4] text-xs">
+              <div className="bg-[#f8f9fa] p-1.5 rounded-xl border border-[#dadce0] text-center">
+                <span className="text-[9px] text-[#5f6368] block font-medium">Status</span>
+                <span className={`font-bold text-[11px] ${isArrived ? 'text-[#137333]' : isStopped ? 'text-[#d93025]' : isSplit ? 'text-[#b06000]' : 'text-[#137333]'}`}>
+                  {isArrived ? '✓ Arrived' : isStopped ? '🛑 Stopped' : isSplit ? '⚠ Behind' : '🟢 Moving'}
+                </span>
+              </div>
+              <div className="bg-[#f8f9fa] p-1.5 rounded-xl border border-[#dadce0] text-center">
+                <span className="text-[9px] text-[#5f6368] block font-medium">Speed</span>
+                <span className="font-mono font-bold text-[11px] text-[#202124]">
+                  {isArrived || isStopped ? '0 km/h' : sel.speed !== null ? `${Math.round(sel.speed)} km/h` : '--'}
+                </span>
+              </div>
+            </div>
+
+            {/* Additional Context Banners */}
+            {isArrived && (
+              <p className="text-[11px] text-[#137333] font-semibold bg-[#e6f4ea] px-2.5 py-1 rounded-xl border border-[#ceead6]">
+                Reached destination {sel.arrivedAtTimeText ? `at ${sel.arrivedAtTimeText}` : ''}
+              </p>
+            )}
+            {isStopped && (
+              <div className="space-y-1">
+                <p className="text-[11px] text-[#c5221f] font-semibold bg-[#fce8e6] px-2.5 py-1 rounded-xl">
+                  Stopped for {sel.stopDurationText || '0 min'} {sel.isLongStop ? '⚠ (Stationary 10+ min)' : ''}
+                </p>
+                {sel.nearbyPetrol && (
+                  <p className="text-[10px] text-[#202124] bg-[#f8f9fa] px-2 py-0.5 rounded-lg border border-[#dadce0]">
+                    ⛽ Petrol nearby: <span className="font-semibold">{sel.nearbyPetrol.name} ({sel.nearbyPetrol.distanceText})</span>
+                  </p>
+                )}
+                {sel.nearbyHotel && (
+                  <p className="text-[10px] text-[#202124] bg-[#f8f9fa] px-2 py-0.5 rounded-lg border border-[#dadce0]">
+                    🏨 Hotel nearby: <span className="font-semibold">{sel.nearbyHotel.name} ({sel.nearbyHotel.distanceText})</span>
+                  </p>
+                )}
+              </div>
+            )}
+            {isSplit && (
+              <p className="text-[11px] text-[#b06000] font-semibold bg-[#fef7e0] px-2.5 py-1 rounded-xl">
+                {sel.distanceFromGroupKm ? `${sel.distanceFromGroupKm} km behind convoy` : 'Falling behind convoy'}
+              </p>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* PROGRESSIVE DISCLOSURE: FLOATING SELECTED POI CARD (Bottom-Left) */}
+      {selectedPOI && (
+        <div className="absolute bottom-22 sm:bottom-6 left-3 sm:left-4 z-40 max-w-[calc(100vw-24px)] sm:max-w-xs w-full bg-white/95 backdrop-blur-md border border-[#dadce0] p-3 rounded-3xl shadow-xl space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-auto text-xs">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-2xl bg-[#e8f0fe] border border-[#d2e3fc] flex items-center justify-center text-base shrink-0">
+                {selectedPOI.icon || (selectedPOI.type === 'petrol' ? '⛽' : '🏨')}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h4 className="text-xs font-bold text-[#202124] truncate">{selectedPOI.name}</h4>
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-[#f1f3f4] text-[#5f6368]">
+                    {selectedPOI.categoryText || (selectedPOI.type === 'petrol' ? 'Petrol Station' : 'Hotel')}
+                  </span>
+                </div>
+                <p className="text-[11px] text-[#5f6368] truncate font-medium">
+                  {selectedPOI.address || 'Along Highway Route'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedPOI(null)}
+              className="p-1 text-[#5f6368] hover:text-[#202124] hover:bg-[#f1f3f4] rounded-full text-xs font-bold"
+            >
+              ✕
+            </button>
+          </div>
+
+          {selectedPOI.distanceText && (
+            <div className="pt-1 border-t border-[#f1f3f4] flex items-center justify-between text-xs">
+              <span className="text-[#5f6368] font-medium text-[11px]">Distance from route:</span>
+              <span className="font-bold text-[#1a73e8] font-mono text-[11px]">{selectedPOI.distanceText}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

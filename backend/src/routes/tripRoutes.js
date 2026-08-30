@@ -14,6 +14,7 @@ router.post('/:tripId/start', tripController.startTrip);
 router.post('/:tripId/end', tripController.endTrip);
 router.get('/:tripId/timeline', tripController.getTripTimeline);
 router.get('/:tripId/stops', tripController.getTripStops);
+router.get('/:tripId/pois', tripController.getTripPOIs);
 router.get('/:tripId/locations', tripController.getTripLocations);
 router.get('/:tripId/location-history', tripController.getTripLocationHistory);
 

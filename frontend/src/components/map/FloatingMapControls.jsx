@@ -56,17 +56,17 @@ export function FloatingMapControls({ showSimPanel, setShowSimPanel }) {
   };
 
   return (
-    <div className="absolute right-4 bottom-20 sm:bottom-6 z-20 flex flex-col items-end gap-2.5 pointer-events-auto">
+    <div className="absolute right-3 sm:right-4 bottom-22 sm:bottom-6 z-20 flex flex-col items-end gap-2 pointer-events-auto">
       {/* Layer Visibility Menu Popup */}
       {isLayerMenuOpen && (
-        <div className="bg-white border border-[#dadce0] p-3 rounded-2xl shadow-xl mb-1 w-52 space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-150 text-xs">
+        <div className="bg-white/95 backdrop-blur-md border border-[#dadce0] p-3 rounded-2xl shadow-xl mb-1 w-52 space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150 text-xs">
           <div className="flex items-center justify-between pb-1.5 border-b border-[#f1f3f4]">
             <span className="font-bold text-[#202124] uppercase tracking-wider text-[10px]">
               Map Layers & Overlay
             </span>
             <button
               onClick={() => setIsLayerMenuOpen(false)}
-              className="text-[#5f6368] hover:text-[#202124] text-xs font-bold"
+              className="text-[#5f6368] hover:text-[#202124] text-xs font-bold p-0.5"
             >
               ✕
             </button>
@@ -75,7 +75,7 @@ export function FloatingMapControls({ showSimPanel, setShowSimPanel }) {
           {/* Layer Toggles */}
           <button
             onClick={() => toggleLayer('route')}
-            className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-[#f1f3f4] transition-colors text-[#3c4043]"
+            className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-[#f1f3f4] transition-colors text-[#3c4043]"
           >
             <span className="flex items-center gap-2 font-medium">
               <Radio className="w-3.5 h-3.5 text-[#1a73e8]" />
@@ -86,7 +86,7 @@ export function FloatingMapControls({ showSimPanel, setShowSimPanel }) {
 
           <button
             onClick={() => toggleLayer('members')}
-            className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-[#f1f3f4] transition-colors text-[#3c4043]"
+            className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-[#f1f3f4] transition-colors text-[#3c4043]"
           >
             <span className="flex items-center gap-2 font-medium">
               <Users className="w-3.5 h-3.5 text-[#1e8e3e]" />
@@ -97,7 +97,7 @@ export function FloatingMapControls({ showSimPanel, setShowSimPanel }) {
 
           <button
             onClick={() => toggleLayer('stops')}
-            className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-[#f1f3f4] transition-colors text-[#3c4043]"
+            className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-[#f1f3f4] transition-colors text-[#3c4043]"
           >
             <span className="flex items-center gap-2 font-medium">
               <MapPin className="w-3.5 h-3.5 text-[#d93025]" />
@@ -106,14 +106,38 @@ export function FloatingMapControls({ showSimPanel, setShowSimPanel }) {
             {layerVisibility?.stops && <Check className="w-4 h-4 text-[#1e8e3e]" />}
           </button>
 
+          {/* Petrol POI Layer */}
+          <button
+            onClick={() => toggleLayer('petrol')}
+            className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-[#f1f3f4] transition-colors text-[#3c4043]"
+          >
+            <span className="flex items-center gap-2 font-medium">
+              <span>⛽</span>
+              <span>Petrol Stations</span>
+            </span>
+            {layerVisibility?.petrol && <Check className="w-4 h-4 text-[#1e8e3e]" />}
+          </button>
+
+          {/* Hotels POI Layer */}
+          <button
+            onClick={() => toggleLayer('hotels')}
+            className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-[#f1f3f4] transition-colors text-[#3c4043]"
+          >
+            <span className="flex items-center gap-2 font-medium">
+              <span>🏨</span>
+              <span>Hotels & Lodges</span>
+            </span>
+            {layerVisibility?.hotels && <Check className="w-4 h-4 text-[#1e8e3e]" />}
+          </button>
+
           {/* Simulation Toggle */}
           <button
             onClick={() => setShowSimPanel(!showSimPanel)}
-            className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-[#f1f3f4] transition-colors text-[#3c4043] pt-1.5 border-t border-[#f1f3f4]"
+            className="w-full flex items-center justify-between p-1.5 rounded-xl hover:bg-[#f1f3f4] transition-colors text-[#3c4043] pt-1.5 border-t border-[#f1f3f4]"
           >
             <span className="flex items-center gap-2 font-medium">
               <Sliders className="w-3.5 h-3.5 text-[#f9ab00]" />
-              <span>Demo Simulation Bar</span>
+              <span>Demo Controls</span>
             </span>
             {showSimPanel && <Check className="w-4 h-4 text-[#1e8e3e]" />}
           </button>
@@ -126,7 +150,7 @@ export function FloatingMapControls({ showSimPanel, setShowSimPanel }) {
         title="Map Layers"
         className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md border transition-all ${
           isLayerMenuOpen
-            ? 'bg-[#1a73e8] text-white border-[#1a73e8] shadow-md'
+            ? 'bg-[#1a73e8] text-white border-[#1a73e8]'
             : 'bg-white text-[#3c4043] border-[#dadce0] hover:bg-[#f8f9fa] hover:text-[#1a73e8]'
         }`}
       >

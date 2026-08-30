@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { getSocket } from '../services/socket.js';
+import { getSocket, connectSocket } from '../services/socket.js';
 import { useTripStore } from '../store/tripStore.js';
 
 export function useSocket(tripId) {
@@ -102,7 +102,7 @@ export function useSocket(tripId) {
     if (socket.connected) {
       socket.emit('join_trip', { tripId });
     } else {
-      socket.connect();
+      connectSocket();
     }
 
     return () => {
