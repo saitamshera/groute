@@ -71,6 +71,16 @@ async function startServer() {
     await initDb();
     await initRedis();
 
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`[Server Error] Port ${PORT} is already in use.`);
+        console.error('Please close the process using this port and try again.');
+        process.exit(1);
+      } else {
+        console.error('[Server Error] Unhandled server error:', err);
+      }
+    });
+
     server.listen(PORT, () => {
       console.log(`
 ╔═══════════════════════════════════════════════════════════════╗
@@ -90,6 +100,25 @@ async function startServer() {
     process.exit(1);
   }
 }
+
+// Graceful Shutdown Handlers
+const shutdown = () => {
+  console.log('[Server] Gracefully shutting down...');
+  server.close(() => {
+    console.log('[Server] HTTP/Socket.IO server closed.');
+    process.exit(0);
+  });
+  
+  // Force close after 10s
+  setTimeout(() => {
+    console.error('[Server] Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+process.on('SIGUSR2', shutdown); // nodemon restart signal
 
 startServer();
 

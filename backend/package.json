@@ -9,6 +9,19 @@
     "dev": "nodemon src/server.js",
     "test": "node tests/run-tests.js"
   },
+  "nodemonConfig": {
+    "watch": [
+      "src/*"
+    ],
+    "ext": "js,json",
+    "ignore": [
+      "node_modules",
+      "tests",
+      "data",
+      "logs"
+    ],
+    "delay": "1500"
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
