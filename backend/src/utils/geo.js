@@ -81,3 +81,49 @@ export function calculateBearing(lat1, lon1, lat2, lon2) {
 export function isWithinRadius(lat1, lon1, lat2, lon2, radiusMeters) {
   return haversineDistanceMeters(lat1, lon1, lat2, lon2) <= radiusMeters;
 }
+
+/**
+ * Approximate distance from a point to a line segment in meters
+ */
+export function pointLineDistanceMeters(pLat, pLon, aLat, aLon, bLat, bLon) {
+  const pLatR = toRad(pLat);
+  const pLonR = toRad(pLon);
+  const aLatR = toRad(aLat);
+  const aLonR = toRad(aLon);
+  const bLatR = toRad(bLat);
+  const bLonR = toRad(bLon);
+
+  const dx = (bLonR - aLonR) * Math.cos((aLatR + bLatR) / 2);
+  const dy = bLatR - aLatR;
+  const len2 = dx * dx + dy * dy;
+
+  if (len2 === 0) {
+    return haversineDistanceMeters(pLat, pLon, aLat, aLon);
+  }
+
+  const px = (pLonR - aLonR) * Math.cos((aLatR + pLatR) / 2);
+  const py = pLatR - aLatR;
+
+  let t = (px * dx + py * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+
+  const projLat = aLat + t * (bLat - aLat);
+  const projLon = aLon + t * (bLon - aLon);
+
+  return haversineDistanceMeters(pLat, pLon, projLat, projLon);
+}
+
+/**
+ * Minimum distance from a point to a full polyline (array of [lat, lng])
+ */
+export function distanceToPolylineMeters(lat, lng, polylineArray) {
+  if (!polylineArray || polylineArray.length < 2) return Infinity;
+  let minDist = Infinity;
+  for (let i = 0; i < polylineArray.length - 1; i++) {
+    const p1 = polylineArray[i];
+    const p2 = polylineArray[i+1];
+    const d = pointLineDistanceMeters(lat, lng, p1[0], p1[1], p2[0], p2[1]);
+    if (d < minDist) minDist = d;
+  }
+  return minDist;
+}

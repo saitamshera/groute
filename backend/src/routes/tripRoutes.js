@@ -12,6 +12,7 @@ router.post('/', validate(createTripSchema), tripController.createTrip);
 router.get('/:tripId', tripController.getTripDetails);
 router.post('/:tripId/start', tripController.startTrip);
 router.post('/:tripId/end', tripController.endTrip);
+router.put('/:tripId/members/:userId/route', tripController.updateMemberRoute);
 router.get('/:tripId/timeline', tripController.getTripTimeline);
 router.get('/:tripId/stops', tripController.getTripStops);
 router.get('/:tripId/pois', tripController.getTripPOIs);

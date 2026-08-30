@@ -111,7 +111,7 @@ export function TripDashboard() {
             setActiveDrawerTab('MEMBERS');
             setDrawerOpen(true);
           }}
-          className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/95 backdrop-blur-md border border-[#dadce0] shadow-md hover:shadow-lg hover:bg-white text-xs font-bold text-[#202124] transition-all min-w-[300px] max-w-[400px]"
+          className="flex items-center gap-3 px-5 py-3 rounded-[28px] bg-white shadow-[0_2px_4px_rgba(0,0,0,0.2)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.15)] text-xs font-bold text-[#202124] transition-shadow min-w-[300px] max-w-[400px]"
         >
           <div className="flex items-center gap-1.5 text-[#1a73e8]">
             <Users className="w-4 h-4" />

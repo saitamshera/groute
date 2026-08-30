@@ -4,8 +4,22 @@ import { getSocket } from '../../services/socket.js';
 import useTripStore from '../../store/tripStore.js';
 import useAuthStore from '../../store/authStore.js';
 
-// Route waypoints from Delhi to Manali along NH44 / NH21
-const routeWaypoints = [
+// Helper for distance in meters (Haversine formula)
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const φ1 = lat1 * Math.PI/180;
+  const φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2-lat1) * Math.PI/180;
+  const Δλ = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// Fallback route waypoints from Delhi to Manali along NH44 / NH21 if no trip is active
+const fallbackRouteWaypoints = [
   { lat: 28.6315, lng: 77.2167, name: 'Connaught Place, Delhi' },
   { lat: 28.7365, lng: 77.1510, name: 'Mukarba Chowk, Delhi' },
   { lat: 29.0264, lng: 77.0700, name: 'Murthal (Sukhdev Dhaba), Haryana' },
@@ -36,13 +50,14 @@ const defaultCohorts = [
 ];
 
 export function DemoController() {
-  const { trip, isSimulationActive, setSimulationActive } = useTripStore();
+  const { trip, isSimulationActive, setSimulationActive, routeCoords, members } = useTripStore();
   const { user: currentUser } = useAuthStore();
   const [speedMultiplier, setSpeedMultiplier] = useState(2); // 1x, 2x, 5x, 10x
   const [stepIndex, setStepIndex] = useState(0);
   const [simAmanStopped, setSimAmanStopped] = useState(false);
   const [simAmanLongStop, setSimAmanLongStop] = useState(false);
   const [simKaranSplit, setSimKaranSplit] = useState(false);
+  const [simPriyaDeviation, setSimPriyaDeviation] = useState(false);
   const [simRahulArrived, setSimRahulArrived] = useState(false);
   const [simAllArrived, setSimAllArrived] = useState(false);
   const [isMinimized, setIsMinimized] = useState(true); // Minimized by default
@@ -85,21 +100,89 @@ export function DemoController() {
     });
   }, [currentUser?.id, currentUser?.name]);
 
-  // Helper interpolation between waypoints
-  const getSimCoords = (index, offset = 0) => {
-    const total = routeWaypoints.length - 1;
-    const progress = Math.max(0, Math.min(total, index / 10));
-    const lowerIdx = Math.floor(progress);
-    const upperIdx = Math.min(total, lowerIdx + 1);
-    const fraction = progress - lowerIdx;
+  // Generate dynamic waypoints based on the actual trip origin and destination
+  const dynamicWaypoints = useMemo(() => {
+    if (trip && trip.origin_lat && trip.destination_lat) {
+      const points = [];
+      const steps = 18;
+      for (let i = 0; i <= steps; i++) {
+        const fraction = i / steps;
+        points.push({
+          lat: trip.origin_lat + (trip.destination_lat - trip.origin_lat) * fraction,
+          lng: trip.origin_lng + (trip.destination_lng - trip.origin_lng) * fraction,
+          name: i === 0 ? 'Start' : i === steps ? 'End' : `Waypoint ${i}`
+        });
+      }
+      return points;
+    }
+    return fallbackRouteWaypoints;
+  }, [trip]);
 
-    const p1 = routeWaypoints[lowerIdx];
-    const p2 = routeWaypoints[upperIdx];
+  // Precompute cumulative distances along the actual polyline
+  const { polylineData, totalDistance } = useMemo(() => {
+    if (routeCoords && routeCoords.length >= 2) {
+      let cumDist = 0;
+      const data = [{ lat: routeCoords[0][0], lng: routeCoords[0][1], dist: 0 }];
+      for (let i = 1; i < routeCoords.length; i++) {
+        const p1 = routeCoords[i-1];
+        const p2 = routeCoords[i];
+        const d = getDistance(p1[0], p1[1], p2[0], p2[1]);
+        cumDist += d;
+        data.push({ lat: p2[0], lng: p2[1], dist: cumDist });
+      }
+      return { polylineData: data, totalDistance: cumDist };
+    }
 
-    const lat = p1.lat + (p2.lat - p1.lat) * fraction + (offset * 0.4);
-    const lng = p1.lng + (p2.lng - p1.lng) * fraction + (offset * 0.2);
+    // Fallback: use dynamic waypoints if no routeCoords available
+    let cumDist = 0;
+    const data = [{ lat: dynamicWaypoints[0].lat, lng: dynamicWaypoints[0].lng, dist: 0 }];
+    for (let i = 1; i < dynamicWaypoints.length; i++) {
+      const p1 = dynamicWaypoints[i-1];
+      const p2 = dynamicWaypoints[i];
+      const d = getDistance(p1.lat, p1.lng, p2.lat, p2.lng);
+      cumDist += d;
+      data.push({ lat: p2.lat, lng: p2.lng, dist: cumDist });
+    }
+    return { polylineData: data, totalDistance: cumDist };
+  }, [routeCoords, dynamicWaypoints]);
 
-    return { lat, lng };
+  // Helper interpolation between polyline vertices
+  const getSimCoords = (index, offsetFraction, targetPolylineData, targetTotalDistance) => {
+    if (!targetPolylineData || targetPolylineData.length < 2) {
+      return { lat: trip?.origin_lat || 0, lng: trip?.origin_lng || 0 };
+    }
+
+    // Total steps for a full trip simulation = 180
+    const progressFraction = Math.max(0, Math.min(1, index / 180));
+    const targetFraction = Math.max(0, Math.min(1, progressFraction + offsetFraction));
+    const targetDist = targetFraction * targetTotalDistance;
+
+    // Linear scan to find the current segment
+    let lowerIdx = 0;
+    for (let i = 0; i < targetPolylineData.length - 1; i++) {
+      if (targetPolylineData[i+1].dist >= targetDist) {
+        lowerIdx = i;
+        break;
+      }
+    }
+
+    const p1 = targetPolylineData[lowerIdx];
+    const p2 = targetPolylineData[lowerIdx + 1];
+
+    if (p1.dist === p2.dist) {
+      return { lat: p1.lat, lng: p1.lng };
+    }
+
+    const fractionInSegment = (targetDist - p1.dist) / (p2.dist - p1.dist);
+    const lat = p1.lat + (p2.lat - p1.lat) * fractionInSegment;
+    const lng = p1.lng + (p2.lng - p1.lng) * fractionInSegment;
+
+    // Add tiny lat/lng jitter so overlapping markers (like those traveling together)
+    // don't perfectly eclipse each other, giving a slight "convoy lane" look
+    const jitterLat = offsetFraction !== 0 ? (offsetFraction * 0.005) : 0;
+    const jitterLng = offsetFraction !== 0 ? (offsetFraction * 0.005) : 0;
+
+    return { lat: lat + jitterLat, lng: lng + jitterLng };
   };
 
   const emitSimulatedStep = (
@@ -107,6 +190,7 @@ export function DemoController() {
     forceAmanStop = simAmanStopped,
     forceAmanLong = simAmanLongStop,
     forceKaranSplit = simKaranSplit,
+    forcePriyaDeviate = simPriyaDeviation,
     forceRahulArrived = simRahulArrived,
     forceAllArrived = simAllArrived
   ) => {
@@ -117,9 +201,35 @@ export function DemoController() {
       let speed = member.baseSpeed + (Math.random() * 6 - 3);
       let offset = member.offset;
 
-      // Special Scenario: ALL TRAVELERS ARRIVED AT MANALI
+      // Extract per-traveler specific assigned route if it exists
+      const storeMember = members.find(m => m.id === member.id);
+      let mPolylineData = polylineData;
+      let mTotalDistance = totalDistance;
+      
+      if (storeMember && storeMember.assigned_route_polyline) {
+        try {
+          const coordsArr = JSON.parse(storeMember.assigned_route_polyline);
+          if (Array.isArray(coordsArr) && coordsArr.length >= 2) {
+            let cumDist = 0;
+            const data = [{ lat: coordsArr[0][0], lng: coordsArr[0][1], dist: 0 }];
+            for (let i = 1; i < coordsArr.length; i++) {
+              const p1 = coordsArr[i-1];
+              const p2 = coordsArr[i];
+              const d = getDistance(p1[0], p1[1], p2[0], p2[1]);
+              cumDist += d;
+              data.push({ lat: p2[0], lng: p2[1], dist: cumDist });
+            }
+            mPolylineData = data;
+            mTotalDistance = cumDist;
+          }
+        } catch (e) {
+          // ignore and fallback to primary group polylineData
+        }
+      }
+
+      // Special Scenario: ALL TRAVELERS ARRIVED AT DESTINATION
       if (forceAllArrived) {
-        const dest = routeWaypoints[routeWaypoints.length - 1];
+        const dest = mPolylineData[mPolylineData.length - 1];
         socket.emit('location:update', {
           tripId: trip.id,
           isSimulated: !member.isCurrentUser,
@@ -136,9 +246,9 @@ export function DemoController() {
         return;
       }
 
-      // Special Scenario: RAHUL ARRIVED AT MANALI
+      // Special Scenario: RAHUL ARRIVED AT DESTINATION
       if (member.key === 'leader' && forceRahulArrived) {
-        const dest = routeWaypoints[routeWaypoints.length - 1];
+        const dest = mPolylineData[mPolylineData.length - 1];
         socket.emit('location:update', {
           tripId: trip.id,
           isSimulated: !member.isCurrentUser,
@@ -155,10 +265,11 @@ export function DemoController() {
         return;
       }
 
-      // Special Scenario: Aman stopped / 10-min long stop at Murthal
+      // Special Scenario: Aman stopped / 10-min long stop
       if (member.key === 'aman') {
         if (forceAmanLong || forceAmanStop) {
-          const murthal = routeWaypoints[2];
+          // Stop at ~15% along the route
+          const murthal = getSimCoords(27, 0, mPolylineData, mTotalDistance);
           // If long stop, backdate timestamp by 11 minutes (660s) to trigger 10-min long stop alert
           const simulatedTimestamp = forceAmanLong ? Date.now() - 660000 : Date.now();
           socket.emit('location:update', {
@@ -189,7 +300,13 @@ export function DemoController() {
         }
       }
 
-      const coords = getSimCoords(currentStep, offset);
+      let coords = getSimCoords(currentStep, offset, mPolylineData, mTotalDistance);
+
+      // Special Scenario: Priya goes off-route (Deviation test)
+      if (member.key === 'priya' && forcePriyaDeviate) {
+        coords.lat += 0.008; // Roughly 800m-1km deviation
+        coords.lng += 0.008;
+      }
 
       socket.emit('location:update', {
         tripId: trip.id,
@@ -229,7 +346,7 @@ export function DemoController() {
         clearInterval(timerRef.current);
       }
     };
-  }, [isSimulationActive, speedMultiplier, simAmanStopped, simAmanLongStop, simKaranSplit, simRahulArrived, simAllArrived, trip?.id, simulatedMembers]);
+  }, [isSimulationActive, speedMultiplier, simAmanStopped, simAmanLongStop, simKaranSplit, simPriyaDeviation, simRahulArrived, simAllArrived, trip?.id, simulatedMembers, polylineData, totalDistance]);
 
   const handleTogglePlay = () => {
     const nextState = !isSimulationActive;
@@ -245,46 +362,53 @@ export function DemoController() {
     setSimAmanStopped(false);
     setSimAmanLongStop(false);
     setSimKaranSplit(false);
+    setSimPriyaDeviation(false);
     setSimRahulArrived(false);
     setSimAllArrived(false);
-    emitSimulatedStep(0, false, false, false, false, false);
+    emitSimulatedStep(0, false, false, false, false, false, false);
   };
 
   const triggerAmanStop = () => {
     const next = !simAmanStopped;
     setSimAmanStopped(next);
     setSimAmanLongStop(false);
-    emitSimulatedStep(stepIndex, next, false, simKaranSplit, simRahulArrived, simAllArrived);
+    emitSimulatedStep(stepIndex, next, false, simKaranSplit, simPriyaDeviation, simRahulArrived, simAllArrived);
   };
 
   const triggerAmanLongStop = () => {
     const next = !simAmanLongStop;
     setSimAmanLongStop(next);
     setSimAmanStopped(next);
-    emitSimulatedStep(stepIndex, next, next, simKaranSplit, simRahulArrived, simAllArrived);
+    emitSimulatedStep(stepIndex, next, next, simKaranSplit, simPriyaDeviation, simRahulArrived, simAllArrived);
   };
 
   const triggerKaranSplit = () => {
     const next = !simKaranSplit;
     setSimKaranSplit(next);
-    emitSimulatedStep(stepIndex, simAmanStopped, simAmanLongStop, next, simRahulArrived, simAllArrived);
+    emitSimulatedStep(stepIndex, simAmanStopped, simAmanLongStop, next, simPriyaDeviation, simRahulArrived, simAllArrived);
+  };
+
+  const triggerPriyaDeviation = () => {
+    const next = !simPriyaDeviation;
+    setSimPriyaDeviation(next);
+    emitSimulatedStep(stepIndex, simAmanStopped, simAmanLongStop, simKaranSplit, next, simRahulArrived, simAllArrived);
   };
 
   const triggerRahulArrival = () => {
     const next = !simRahulArrived;
     setSimRahulArrived(next);
-    emitSimulatedStep(stepIndex, simAmanStopped, simAmanLongStop, simKaranSplit, next, simAllArrived);
+    emitSimulatedStep(stepIndex, simAmanStopped, simAmanLongStop, simKaranSplit, simPriyaDeviation, next, simAllArrived);
   };
 
   const triggerAllArrival = () => {
     const next = !simAllArrived;
     setSimAllArrived(next);
-    emitSimulatedStep(stepIndex, simAmanStopped, simAmanLongStop, simKaranSplit, simRahulArrived, next);
+    emitSimulatedStep(stepIndex, simAmanStopped, simAmanLongStop, simKaranSplit, simPriyaDeviation, simRahulArrived, next);
   };
 
   if (isMinimized) {
     return (
-      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md text-[#202124] text-xs font-bold shadow-md border border-[#dadce0] pointer-events-auto">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-[24px] bg-white text-[#202124] text-xs font-bold shadow-[0_2px_4px_rgba(0,0,0,0.2)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.15)] pointer-events-auto transition-shadow">
         <button
           onClick={handleTogglePlay}
           className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-colors ${
@@ -310,7 +434,7 @@ export function DemoController() {
   }
 
   return (
-    <div className="bg-white/95 backdrop-blur-md border border-[#dadce0] rounded-3xl p-3 sm:p-3.5 shadow-xl max-w-[95vw] sm:max-w-md w-full animate-in fade-in slide-in-from-bottom-2 duration-150">
+    <div className="bg-white rounded-[16px] p-3 sm:p-4 shadow-[0_4px_12px_rgba(0,0,0,0.2)] max-w-[95vw] sm:max-w-md w-full animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-auto">
       {/* Header Bar */}
       <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-[#f1f3f4]">
         <div className="flex items-center gap-2 min-w-0">
@@ -325,14 +449,14 @@ export function DemoController() {
 
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Speed Multipliers */}
-          <div className="flex items-center gap-0.5 bg-[#f8f9fa] px-1 py-0.5 rounded-full border border-[#dadce0] text-[10px]">
+          <div className="flex items-center gap-0.5 bg-[#f1f3f4] p-0.5 rounded-full text-[10px]">
             {[1, 2, 5, 10].map((s) => (
               <button
                 key={s}
                 onClick={() => setSpeedMultiplier(s)}
-                className={`px-1.5 py-0.2 rounded-full font-mono font-bold transition-colors ${
+                className={`px-2 py-0.5 rounded-full font-mono font-bold transition-colors ${
                   speedMultiplier === s
-                    ? 'bg-[#1a73e8] text-white'
+                    ? 'bg-white text-[#1a73e8] shadow-sm'
                     : 'text-[#5f6368] hover:text-[#202124]'
                 }`}
               >
@@ -370,20 +494,20 @@ export function DemoController() {
           <button
             onClick={handleReset}
             title="Reset Simulation"
-            className="p-1.5 rounded-full bg-white hover:bg-[#f1f3f4] border border-[#dadce0] text-[#5f6368] transition-colors"
+            className="p-1.5 rounded-full bg-white hover:bg-[#f8f9fa] shadow-[0_1px_2px_rgba(0,0,0,0.15)] text-[#5f6368] transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
         </div>
 
         {/* Quick Scenario Triggers */}
-        <div className="flex flex-wrap items-center gap-1 text-xs">
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           <button
             onClick={triggerAmanStop}
-            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold border transition-all text-[11px] ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold shadow-sm transition-all ${
               simAmanStopped && !simAmanLongStop
-                ? 'bg-[#fce8e6] border-[#fad2cf] text-[#c5221f]'
-                : 'bg-white border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
+                ? 'bg-[#fce8e6] text-[#c5221f]'
+                : 'bg-white text-[#3c4043] border border-[#dadce0] hover:bg-[#f8f9fa]'
             }`}
           >
             <span>🛑</span>
@@ -392,10 +516,10 @@ export function DemoController() {
 
           <button
             onClick={triggerAmanLongStop}
-            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold border transition-all text-[11px] ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold shadow-sm transition-all ${
               simAmanLongStop
-                ? 'bg-[#fce8e6] border-[#fad2cf] text-[#c5221f]'
-                : 'bg-white border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
+                ? 'bg-[#fce8e6] text-[#c5221f]'
+                : 'bg-white text-[#3c4043] border border-[#dadce0] hover:bg-[#f8f9fa]'
             }`}
             title="Trigger 10-Minute Stationary Stop at Murthal with nearby Petrol & Hotel"
           >
@@ -405,10 +529,10 @@ export function DemoController() {
 
           <button
             onClick={triggerKaranSplit}
-            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold border transition-all text-[11px] ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold shadow-sm transition-all ${
               simKaranSplit
-                ? 'bg-[#fef7e0] border-[#feefc3] text-[#b06000]'
-                : 'bg-white border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
+                ? 'bg-[#fef7e0] text-[#b06000]'
+                : 'bg-white text-[#3c4043] border border-[#dadce0] hover:bg-[#f8f9fa]'
             }`}
           >
             <span>⚠</span>
@@ -416,11 +540,23 @@ export function DemoController() {
           </button>
 
           <button
+            onClick={triggerPriyaDeviation}
+            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold shadow-sm transition-all ${
+              simPriyaDeviation
+                ? 'bg-[#fce8e6] text-[#c5221f]'
+                : 'bg-white text-[#3c4043] border border-[#dadce0] hover:bg-[#f8f9fa]'
+            }`}
+          >
+            <span>🛣️</span>
+            <span>{simPriyaDeviation ? 'Snap Priya Back' : 'Deviate Priya (Off Route)'}</span>
+          </button>
+
+          <button
             onClick={triggerRahulArrival}
-            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold border transition-all text-[11px] ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold shadow-sm transition-all ${
               simRahulArrived
-                ? 'bg-[#e6f4ea] border-[#ceead6] text-[#137333]'
-                : 'bg-white border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
+                ? 'bg-[#e6f4ea] text-[#137333]'
+                : 'bg-white text-[#3c4043] border border-[#dadce0] hover:bg-[#f8f9fa]'
             }`}
             title="Simulate Leader Rahul reaching destination"
           >
@@ -430,10 +566,10 @@ export function DemoController() {
 
           <button
             onClick={triggerAllArrival}
-            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold border transition-all text-[11px] ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-full font-bold shadow-sm transition-all ${
               simAllArrived
-                ? 'bg-[#e6f4ea] border-[#ceead6] text-[#137333]'
-                : 'bg-white border-[#dadce0] text-[#3c4043] hover:bg-[#f8f9fa]'
+                ? 'bg-[#e6f4ea] text-[#137333]'
+                : 'bg-white text-[#3c4043] border border-[#dadce0] hover:bg-[#f8f9fa]'
             }`}
             title="Simulate all 5 convoy members reaching destination"
           >

@@ -24,16 +24,21 @@ export function Login() {
   const handleDemoLogin = async (demoEmail, demoPass) => {
     setEmail(demoEmail);
     setPassword(demoPass);
+    setLocalError('');
     try {
       await login(demoEmail, demoPass);
       navigate('/dashboard');
     } catch (err) {
-      // If demo user doesn't exist, create it automatically
-      const name = demoEmail.split('@')[0];
-      const capitalized = name.charAt(0).toUpperCase() + name.slice(1);
-      const { register } = useAuthStore.getState();
-      await register(capitalized, demoEmail, demoPass);
-      navigate('/dashboard');
+      try {
+        // If demo user doesn't exist, create it automatically
+        const name = demoEmail.split('@')[0];
+        const capitalized = name.charAt(0).toUpperCase() + name.slice(1);
+        const { register } = useAuthStore.getState();
+        await register(capitalized, demoEmail, demoPass);
+        navigate('/dashboard');
+      } catch (regErr) {
+        setLocalError('Demo login failed: Incorrect password for existing account or registration failed.');
+      }
     }
   };
 

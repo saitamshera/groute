@@ -60,7 +60,7 @@ export function FloatingMapControls({ showSimPanel, setShowSimPanel }) {
     <div className={`absolute bottom-22 sm:bottom-6 z-20 flex flex-col items-end gap-2 pointer-events-auto transition-all duration-300 ${isDrawerOpen ? 'right-4 md:right-[410px]' : 'right-4'}`}>
       {/* Layer Visibility Menu Popup */}
       {isLayerMenuOpen && (
-        <div className="bg-white/95 backdrop-blur-md border border-[#dadce0] p-3 rounded-2xl shadow-xl mb-1 w-52 space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150 text-xs">
+        <div className="bg-white p-3 rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.2)] mb-1 w-52 space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150 text-xs">
           <div className="flex items-center justify-between pb-1.5 border-b border-[#f1f3f4]">
             <span className="font-bold text-[#202124] uppercase tracking-wider text-[10px]">
               Map Layers & Overlay
@@ -149,48 +149,48 @@ export function FloatingMapControls({ showSimPanel, setShowSimPanel }) {
       <button
         onClick={() => setIsLayerMenuOpen(!isLayerMenuOpen)}
         title="Map Layers"
-        className={`w-10 h-10 rounded-full flex items-center justify-center shadow-md border transition-all ${
+        className={`w-10 h-10 rounded-full flex items-center justify-center shadow-[0_1px_4px_rgba(0,0,0,0.3)] transition-all ${
           isLayerMenuOpen
-            ? 'bg-[#1a73e8] text-white border-[#1a73e8]'
-            : 'bg-white text-[#3c4043] border-[#dadce0] hover:bg-[#f8f9fa] hover:text-[#1a73e8]'
+            ? 'bg-[#1a73e8] text-white'
+            : 'bg-white text-[#5f6368] hover:text-[#202124]'
         }`}
       >
-        <Layers className="w-4 h-4" />
+        <Layers className="w-5 h-5" />
       </button>
 
       {/* Fit Group Convoy Button */}
       <button
         onClick={fitConvoy}
         title="Fit All Convoy Members (Show Group)"
-        className="w-10 h-10 rounded-full bg-white text-[#3c4043] border border-[#dadce0] hover:bg-[#f8f9fa] hover:text-[#1a73e8] shadow-md flex items-center justify-center transition-all group"
+        className="w-10 h-10 rounded-full bg-white text-[#5f6368] hover:text-[#202124] shadow-[0_1px_4px_rgba(0,0,0,0.3)] flex items-center justify-center transition-all group"
       >
-        <Compass className="w-4 h-4 group-hover:rotate-45 transition-transform" />
+        <Compass className="w-5 h-5 group-hover:rotate-45 transition-transform" />
       </button>
 
       {/* Current Location Button */}
       <button
         onClick={handleLocateMe}
         title="Center on My Location"
-        className="w-10 h-10 rounded-full bg-white text-[#3c4043] border border-[#dadce0] hover:bg-[#f8f9fa] hover:text-[#1a73e8] shadow-md flex items-center justify-center transition-all"
+        className="w-10 h-10 rounded-full bg-white text-[#5f6368] hover:text-[#202124] shadow-[0_1px_4px_rgba(0,0,0,0.3)] flex items-center justify-center transition-all"
       >
-        <Crosshair className="w-4 h-4" />
+        <Crosshair className="w-5 h-5" />
       </button>
 
       {/* Zoom Controls Container */}
-      <div className="bg-white border border-[#dadce0] rounded-full shadow-md overflow-hidden flex flex-col">
+      <div className="bg-white shadow-[0_1px_4px_rgba(0,0,0,0.3)] rounded-[8px] overflow-hidden flex flex-col mt-2">
         <button
           onClick={handleZoomIn}
           title="Zoom In"
-          className="w-10 h-10 flex items-center justify-center text-[#3c4043] hover:bg-[#f1f3f4] hover:text-[#1a73e8] border-b border-[#f1f3f4] transition-colors"
+          className="w-10 h-10 flex items-center justify-center text-[#5f6368] hover:bg-[#f8f9fa] hover:text-[#202124] border-b border-[#f1f3f4] transition-colors"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-5 h-5" />
         </button>
         <button
           onClick={handleZoomOut}
           title="Zoom Out"
-          className="w-10 h-10 flex items-center justify-center text-[#3c4043] hover:bg-[#f1f3f4] hover:text-[#1a73e8] transition-colors"
+          className="w-10 h-10 flex items-center justify-center text-[#5f6368] hover:bg-[#f8f9fa] hover:text-[#202124] transition-colors"
         >
-          <Minus className="w-4 h-4" />
+          <Minus className="w-5 h-5" />
         </button>
       </div>
     </div>

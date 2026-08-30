@@ -128,6 +128,7 @@ export const tripController = {
           profile_image: user ? user.profile_image : '',
           role: gm.role,
           location_sharing: tm ? tm.location_sharing : false,
+          assigned_route_polyline: tm ? tm.assigned_route_polyline : null,
           joined_at: gm.joined_at
         };
       });
@@ -271,6 +272,40 @@ export const tripController = {
     } catch (err) {
       console.error('[Trip] End trip error:', err);
       return res.status(500).json({ error: 'Failed to complete trip.' });
+    }
+  },
+
+  async updateMemberRoute(req, res) {
+    try {
+      const { tripId, userId } = req.params;
+      const { route_polyline } = req.body;
+
+      const trip = db.tables.get('trips').find(t => t.id === tripId);
+      if (!trip) {
+        return res.status(404).json({ error: 'Trip not found.' });
+      }
+
+      // Check permissions: Only the user or the trip owner can update it
+      const membership = db.tables.get('group_members').find(
+        m => m.group_id === trip.group_id && m.user_id === req.user.id
+      );
+      if (!membership || (membership.role !== 'OWNER' && req.user.id !== userId)) {
+        return res.status(403).json({ error: 'Permission denied.' });
+      }
+
+      const tripMember = db.tables.get('trip_members').find(tm => tm.trip_id === tripId && tm.user_id === userId);
+      if (!tripMember) {
+        return res.status(404).json({ error: 'User is not a part of this trip.' });
+      }
+
+      const updated = db.tables.update('trip_members', tm => tm.id === tripMember.id, {
+        assigned_route_polyline: route_polyline
+      });
+
+      return res.json({ message: 'Member route updated successfully', member: updated });
+    } catch (err) {
+      console.error('[Trip] Update member route error:', err);
+      return res.status(500).json({ error: 'Failed to update member route.' });
     }
   },
 

@@ -20,7 +20,8 @@ export function selectTravelers(members = [], liveLocations = {}, currentUserId 
         email: m.email || '',
         profile_image: m.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.name || m.id}`,
         role: m.role || 'MEMBER',
-        location_sharing: m.location_sharing !== false
+        location_sharing: m.location_sharing !== false,
+        assigned_route_polyline: m.assigned_route_polyline || null
       });
     }
   });
@@ -153,7 +154,8 @@ export function selectTravelers(members = [], liveLocations = {}, currentUserId 
       lastSeen: timestamp,
       ageSeconds,
       isStale,
-      isSharingOff
+      isSharingOff,
+      assigned_route_polyline: traveler.assigned_route_polyline || null
     };
   });
 
@@ -179,7 +181,7 @@ export function selectTravelers(members = [], liveLocations = {}, currentUserId 
     let convoyRole = 'MAIN_CONVOY';
     if (t.status === 'ARRIVED') convoyRole = 'ARRIVED';
     else if (isLeader) convoyRole = 'LEADER';
-    else if (t.status === 'SPLIT' || t.status === 'FALLING_BEHIND') convoyRole = 'BEHIND';
+    else if (t.status === 'SPLIT' || t.status === 'FALLING_BEHIND' || t.status === 'OFF_ROUTE') convoyRole = 'BEHIND';
     else if (t.status === 'STOPPED' || t.status === 'POSSIBLE_STOP') convoyRole = 'STOPPED';
 
     // Calculate relative distance and human-readable position statement
@@ -190,6 +192,8 @@ export function selectTravelers(members = [], liveLocations = {}, currentUserId 
       relativePositionText = 'Leader';
     } else if (t.status === 'ARRIVED') {
       relativePositionText = 'Arrived';
+    } else if (t.status === 'OFF_ROUTE') {
+      relativePositionText = 'Off route';
     } else if (t.status === 'STOPPED' || t.status === 'POSSIBLE_STOP') {
       relativePositionText = 'Stopped';
     } else if (leaderTravelerObj && leaderTravelerObj.distanceToDestinationKm !== null && t.distanceToDestinationKm !== null) {
@@ -254,6 +258,7 @@ export const useTripStore = create((set, get) => ({
   events: [],
   groupCenter: null,
   groupEta: { formattedEta: 'Calculating...', totalMinutes: 0 },
+  routeCoords: [], // Fetched polyline geometry for the map and simulation
   
   // UI & Interaction states
   selectedMemberId: null,
@@ -304,6 +309,7 @@ export const useTripStore = create((set, get) => ({
   },
 
   setTripData: (data) => set(data),
+  setRouteCoords: (coords) => set({ routeCoords: coords }),
 
   setLiveLocations: (locations) => {
     set((state) => {
@@ -580,6 +586,7 @@ export const useTripStore = create((set, get) => ({
     events: [],
     groupCenter: null,
     groupEta: { formattedEta: 'Calculating...', totalMinutes: 0 },
+    routeCoords: [],
     selectedMemberId: null,
     selectedStop: null,
     selectedPOI: null,

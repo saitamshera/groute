@@ -130,19 +130,57 @@ export async function initDb() {
         if (seededAny) {
           console.log('[DB] Synchronized initial local records into MongoDB.');
         }
-      } else {
-        saveLocalDb();
       }
 
-      return;
     } catch (err) {
       console.warn(`[DB] ⚠️ MongoDB connection failed (${err.message}). Activating robust local data store fallback.`);
       isMongoConnected = false;
+      loadLocalDb();
+      console.log('[DB] Local embedded storage engine active & initialized.');
+    }
+  } else {
+    loadLocalDb();
+    console.log('[DB] Local embedded storage engine active & initialized.');
+  }
+
+  // ---------------------------------------------------------
+  // ENSURE DEMO USERS EXIST (Rahul and Aman)
+  // ---------------------------------------------------------
+  const demoUsers = [
+    { email: 'rahul@example.com', name: 'Rahul' },
+    { email: 'aman@example.com', name: 'Aman' }
+  ];
+  const demoHash = '$2a$10$Gr9SVdJpBMkGJdgmv6/7e.NNfZaS/BuVmO9vGIElCwp6ybjyrA4kW'; // 'password123'
+  
+  let patchedDemos = false;
+  for (const demo of demoUsers) {
+    let u = localDbCache.users.find(x => x.email.toLowerCase() === demo.email);
+    if (!u) {
+      u = {
+        id: uuidv4(),
+        name: demo.name,
+        email: demo.email,
+        password_hash: demoHash,
+        profile_image: `https://api.dicebear.com/7.x/avataaars/svg?seed=${demo.name}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`,
+        created_at: new Date().toISOString()
+      };
+      localDbCache.users.push(u);
+      if (isMongoConnected && mongoDb) {
+        await mongoDb.collection('users').insertOne({ ...u }).catch(() => {});
+      }
+      patchedDemos = true;
+    } else if (u.password_hash !== demoHash) {
+      u.password_hash = demoHash;
+      if (isMongoConnected && mongoDb) {
+        await mongoDb.collection('users').updateOne({ id: u.id }, { $set: { password_hash: demoHash } }).catch(() => {});
+      }
+      patchedDemos = true;
     }
   }
 
-  loadLocalDb();
-  console.log('[DB] Local embedded storage engine active & initialized.');
+  if (patchedDemos) {
+    saveLocalDb();
+  }
 }
 
 // Database helper object

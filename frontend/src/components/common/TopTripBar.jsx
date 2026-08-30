@@ -43,9 +43,9 @@ export function TopTripBar({ onStartTrip, onEndTrip }) {
   };
 
   return (
-    <div className="absolute top-4 left-4 z-30 pointer-events-none flex items-center justify-between gap-2 max-w-[680px] w-[calc(100%-32px)]">
+    <div className="absolute top-4 left-4 z-30 pointer-events-none flex items-center justify-between gap-3 max-w-[680px] w-[calc(100%-32px)]">
       {/* Sleek Compact Google Maps Navigation Bar */}
-      <div className="pointer-events-auto flex items-center gap-2 bg-white/95 backdrop-blur-md border border-[#dadce0] p-1.5 rounded-full shadow-md hover:shadow-lg transition-all min-w-0 flex-1">
+      <div className="pointer-events-auto flex items-center gap-2 bg-white p-1.5 rounded-[24px] shadow-[0_2px_4px_rgba(0,0,0,0.2)] hover:shadow-[0_4px_8px_rgba(0,0,0,0.15)] transition-shadow min-w-0 flex-1">
         {/* Back Button */}
         <Link
           to="/dashboard"
@@ -62,29 +62,29 @@ export function TopTripBar({ onStartTrip, onEndTrip }) {
             {trip.origin} → {trip.destination}
           </span>
           <span
-            className={`hidden sm:inline-flex px-2 py-0.2 rounded-full text-[9px] font-extrabold uppercase shrink-0 ${
-              isActive
-                ? 'bg-[#e6f4ea] text-[#137333] border border-[#ceead6]'
-                : 'bg-[#f1f3f4] text-[#5f6368] border border-[#dadce0]'
+            className={`hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
+              isActive ? 'text-[#137333]' : 'text-[#5f6368]'
             }`}
           >
-            {isActive ? '● LIVE' : trip.status}
+            {isActive ? <span className="w-1.5 h-1.5 rounded-full bg-[#137333] animate-pulse"></span> : null}
+            {isActive ? 'LIVE' : trip.status}
           </span>
         </div>
 
         {/* Clustered Group ETA */}
-        <div className="hidden md:flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#f8f9fa] border border-[#dadce0] text-xs shrink-0 mr-1">
-          <Clock className="w-3 h-3 text-[#1a73e8]" />
-          <span className="font-mono font-bold text-[#1a73e8] text-[11px]">
-            ETA {groupEta?.formattedEta || '...'}
+        <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs shrink-0 mr-1 bg-white">
+          <span className="text-[#5f6368] text-[10px] font-bold">ETA</span>
+          <span className="font-mono font-bold text-[#1a73e8] text-sm leading-none">
+            {groupEta?.formattedEta || '--:--'}
           </span>
+          <Clock className="w-3.5 h-3.5 text-[#1a73e8] ml-0.5" />
         </div>
 
         {/* Owner Action Buttons */}
         {isOwner && trip.status === 'PLANNED' && (
           <button
             onClick={onStartTrip}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#1e8e3e] hover:bg-[#137333] text-white font-bold text-xs shadow-xs transition-colors shrink-0 mr-1"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-[#1a73e8] hover:bg-[#1557d0] shadow-[0_1px_2px_rgba(0,0,0,0.15)] text-white font-bold text-xs transition-colors shrink-0 mr-1"
           >
             <Play className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Start</span>
@@ -94,10 +94,9 @@ export function TopTripBar({ onStartTrip, onEndTrip }) {
         {isOwner && isActive && (
           <button
             onClick={onEndTrip}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white hover:bg-[#fce8e6] text-[#d93025] font-bold text-xs border border-[#dadce0] hover:border-[#d93025] transition-colors shrink-0 mr-1"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-white hover:bg-[#fce8e6] text-[#d93025] font-bold text-xs shadow-[0_1px_2px_rgba(0,0,0,0.15)] transition-colors shrink-0 mr-1"
           >
-            <CheckCircle className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">End</span>
+            <span className="hidden sm:inline">End Route</span>
           </button>
         )}
       </div>
@@ -106,14 +105,16 @@ export function TopTripBar({ onStartTrip, onEndTrip }) {
       <div className="pointer-events-auto shrink-0 hidden md:block">
         <button
           onClick={() => handleToggleDrawer('MEMBERS')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border shadow-md transition-all text-xs font-bold ${
-            isDrawerOpen && activeDrawerTab === 'MEMBERS'
-              ? 'bg-[#1a73e8] text-white border-[#1a73e8]'
-              : 'bg-white/95 backdrop-blur-md text-[#202124] border-[#dadce0] hover:bg-[#f8f9fa]'
-          }`}
+          className={`flex items-center gap-2.5 px-4 py-2 rounded-[24px] shadow-[0_2px_4px_rgba(0,0,0,0.2)] transition-shadow text-xs font-bold bg-white hover:shadow-[0_4px_8px_rgba(0,0,0,0.15)]`}
         >
-          <Users className="w-3.5 h-3.5" />
-          <span>{travelers.length} Travelers</span>
+          <div className="flex items-center -space-x-1.5">
+            {travelers.slice(0, 3).map((t, i) => (
+              <div key={t.id || i} className="w-5 h-5 rounded-full bg-[#1a73e8] border border-white text-white flex items-center justify-center text-[9px] relative z-10 shadow-sm">
+                {t.name?.[0]?.toUpperCase() || '?'}
+              </div>
+            ))}
+          </div>
+          <span className="text-[#3c4043]">{travelers.length} Travelers</span>
         </button>
       </div>
     </div>

@@ -18,7 +18,7 @@ export function Navbar() {
   if (!isAuthenticated) return null;
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-white border-b border-[#dadce0] shadow-xs">
+    <header className="sticky top-0 z-40 w-full bg-white shadow-[0_1px_2px_0_rgba(60,64,67,0.3),0_1px_3px_1px_rgba(60,64,67,0.15)]">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-2">
         {/* Brand Logo */}
         <Link to="/dashboard" className="flex items-center gap-2 group shrink-0 min-w-0">
@@ -73,11 +73,11 @@ export function Navbar() {
         {/* Right User & Live Status */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Socket Connection Pill */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#f8f9fa] border border-[#dadce0] text-xs text-[#5f6368]">
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white border border-[#e0e0e0] shadow-sm text-xs text-[#5f6368]">
             <span
               className={`w-2 h-2 rounded-full ${
                 connectionStatus === 'connected'
-                  ? 'bg-[#1e8e3e]'
+                  ? 'bg-[#34a853]'
                   : 'bg-[#f9ab00] animate-pulse'
               }`}
             />
@@ -85,7 +85,7 @@ export function Navbar() {
           </div>
 
           {/* User Profile */}
-          <div className="flex items-center gap-2 pl-2 border-l border-[#dadce0]">
+          <div className="flex items-center gap-2 pl-3 border-l border-[#e0e0e0] ml-1">
             <img
               src={user?.profile_image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || 'User'}`}
               alt={user?.name}

@@ -38,9 +38,13 @@ export function App() {
 
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <div className="min-h-screen bg-[#f8f9fa] text-[#202124] flex flex-col font-sans">
-        <Navbar />
-        <main className="flex-1">
+      <div className="min-h-screen bg-[#f1f3f4] text-[#202124] flex flex-col font-sans relative">
+        {/* Optional Faint Map Texture Background */}
+        <div className="absolute inset-0 z-0 pointer-events-none opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#202124 1px, transparent 1px)', backgroundSize: '32px 32px' }}></div>
+        
+        <div className="relative z-10 flex flex-col min-h-screen">
+          <Navbar />
+          <main className="flex-1">
           <Routes>
             {/* Public Routes */}
             <Route path="/login" element={<Login />} />
@@ -92,6 +96,7 @@ export function App() {
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </main>
+        </div>
       </div>
     </BrowserRouter>
   );

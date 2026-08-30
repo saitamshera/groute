@@ -1,4 +1,4 @@
-import { haversineDistanceKm, haversineDistanceMeters, calculateCentroid } from '../utils/geo.js';
+import { haversineDistanceKm, haversineDistanceMeters, calculateCentroid, distanceToPolylineMeters } from '../utils/geo.js';
 import mapService from './mapService.js';
 import redisStore from './redisStore.js';
 import db from '../models/db.js';
@@ -23,7 +23,8 @@ function getMemberBuffer(tripId, userId) {
       arrivedAt: null,
       splitCandidateStartTime: null,
       isSplitAlerted: false,
-      lastEmittedRejoinTime: 0
+      lastEmittedRejoinTime: 0,
+      isOffRoute: false
     });
   }
   return memberStateBuffers.get(key);
@@ -145,6 +146,11 @@ export const eventEngine = {
           generatedEvents.push(allArrivedEvent);
         }
       }
+    } else if (!isNearDestination && buffer.currentStatus === 'ARRIVED') {
+      // Revert from ARRIVED if traveler jumps away from destination (e.g. simulation reset)
+      buffer.currentStatus = isSpeedStationary ? 'STOPPED' : 'MOVING';
+      buffer.isArrivedEmitted = false;
+      buffer.arrivedAt = null;
     }
 
     // 4. STOP DETECTION & 10-MINUTE STATIONARY STOP ENGINE
@@ -297,6 +303,36 @@ export const eventEngine = {
       }
     }
 
+    // 4.5 OFF-ROUTE DEVIATION DETECTION
+    const tripMember = db.tables.get('trip_members').find(tm => tm.trip_id === tripId && tm.user_id === userId);
+    let routePolylineStr = tripMember?.assigned_route_polyline || trip.route_polyline;
+    
+    if (routePolylineStr && buffer.currentStatus !== 'ARRIVED' && !isLowAccuracy) {
+      try {
+        const polylineArray = JSON.parse(routePolylineStr);
+        if (Array.isArray(polylineArray) && polylineArray.length > 1) {
+          const distToRouteMeters = distanceToPolylineMeters(latitude, longitude, polylineArray);
+          
+          if (distToRouteMeters > 500) {
+            if (!buffer.isOffRoute) {
+              buffer.isOffRoute = true;
+              buffer.currentStatus = 'OFF_ROUTE';
+              // Could also emit an event here if needed
+            } else if (buffer.currentStatus !== 'STOPPED' && buffer.currentStatus !== 'POSSIBLE_STOP') {
+              buffer.currentStatus = 'OFF_ROUTE';
+            }
+          } else if (distToRouteMeters < 300 && buffer.isOffRoute) {
+            buffer.isOffRoute = false;
+            if (buffer.currentStatus === 'OFF_ROUTE') {
+              buffer.currentStatus = isSpeedStationary ? 'STOPPED' : 'MOVING';
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[EventEngine] Failed to parse route polyline for deviation check: ${err.message}`);
+      }
+    }
+
     // 5. Update Current Member's Redis State
     const individualEta = mapService.calculateIndividualEta(
       latitude,
@@ -362,7 +398,7 @@ export const eventEngine = {
     });
 
     // A. DETERMINE CONVOY LEADER (Furthest ahead along route among active non-arrived travelers)
-    const travelingMembers = activeLocations.filter(loc => loc.status !== 'ARRIVED' && loc.latitude && loc.longitude);
+    const travelingMembers = activeLocations.filter(loc => loc.status !== 'ARRIVED' && loc.status !== 'OFF_ROUTE' && loc.latitude && loc.longitude);
     let leaderUserId = null;
     let maxProgress = -1;
 

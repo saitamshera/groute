@@ -20,25 +20,26 @@ function createTravelerIcon(traveler) {
   const isStopped = traveler.status === 'STOPPED' || traveler.status === 'POSSIBLE_STOP';
   const isSplit = traveler.status === 'SPLIT' || traveler.status === 'FALLING_BEHIND';
   const isArrived = traveler.status === 'ARRIVED';
+  const isOffRoute = traveler.status === 'OFF_ROUTE';
 
-  let bgColor = '#1e8e3e'; // green - moving
-  let emoji = '🚗';
-  if (isLeader) { bgColor = '#1a73e8'; emoji = '👑'; }
-  if (isStopped) { bgColor = '#d93025'; emoji = '🛑'; }
-  if (isSplit) { bgColor = '#f9ab00'; emoji = '⚠️'; }
-  if (isArrived) { bgColor = '#7627bb'; emoji = '🏁'; }
+  let borderColor = '#1a73e8'; // Google Blue
+  if (isStopped) borderColor = '#d93025';
+  if (isSplit) borderColor = '#f9ab00';
+  if (isArrived) borderColor = '#7627bb';
+  if (isOffRoute) borderColor = '#ea4335'; // Distinct Red for off-route
 
-  const name = traveler.name?.split(' ')[0] || '?';
+  const nameInitial = traveler.name?.charAt(0).toUpperCase() || '?';
 
   return L.divIcon({
     className: 'leaflet-traveler-marker',
     html: `
-      <div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);">
-        <div style="background:${bgColor};color:#fff;border-radius:16px;padding:3px 8px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25);border:2px solid #fff;display:flex;align-items:center;gap:3px;">
-          <span style="font-size:12px;">${emoji}</span>
-          <span>${name}</span>
+      <div style="position:relative;width:32px;height:32px;transform:translate(-50%,-50%);">
+        <div style="position:absolute;inset:-4px;background:${borderColor}33;border-radius:50%;z-index:0;"></div>
+        <div style="position:absolute;inset:0;background:white;border:2px ${isOffRoute ? 'dashed' : 'solid'} ${borderColor};border-radius:50%;box-shadow:0 1px 3px rgba(60,64,67,0.3);display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;color:#202124;z-index:1;">
+          ${nameInitial}
         </div>
-        <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid ${bgColor};margin-top:-1px;"></div>
+        ${isLeader ? `<div style="position:absolute;top:-6px;right:-6px;background:#fef7e0;border:1px solid #f9ab00;border-radius:50%;font-size:10px;padding:2px;z-index:2;box-shadow:0 1px 2px rgba(60,64,67,0.15);">👑</div>` : ''}
+        ${isOffRoute ? `<div style="position:absolute;bottom:-6px;right:-6px;background:#fce8e6;border:1px solid #c5221f;border-radius:50%;font-size:10px;padding:2px;z-index:2;box-shadow:0 1px 2px rgba(60,64,67,0.15);">⚠️</div>` : ''}
       </div>
     `,
     iconSize: [0, 0],
@@ -49,10 +50,13 @@ function createTravelerIcon(traveler) {
 function createOriginIcon() {
   return L.divIcon({
     className: 'leaflet-origin-marker',
-    html: `<div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);">
-      <div style="background:#137333;color:#fff;border-radius:16px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25);border:2px solid #fff;">🟢 Start</div>
-      <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #137333;margin-top:-1px;"></div>
-    </div>`,
+    html: `
+      <div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);">
+        <div style="width:24px;height:24px;background:#1e8e3e;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 1px 3px rgba(60,64,67,0.3);position:relative;">
+          <div style="width:6px;height:6px;background:#fff;border-radius:50%;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+        </div>
+      </div>
+    `,
     iconSize: [0, 0],
     iconAnchor: [0, 0],
   });
@@ -61,10 +65,13 @@ function createOriginIcon() {
 function createDestinationIcon() {
   return L.divIcon({
     className: 'leaflet-dest-marker',
-    html: `<div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);">
-      <div style="background:#d93025;color:#fff;border-radius:16px;padding:3px 10px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25);border:2px solid #fff;">🏁 Destination</div>
-      <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #d93025;margin-top:-1px;"></div>
-    </div>`,
+    html: `
+      <div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);">
+        <div style="width:24px;height:24px;background:#d93025;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 1px 3px rgba(60,64,67,0.3);position:relative;">
+          <div style="width:6px;height:6px;background:#fff;border-radius:50%;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);"></div>
+        </div>
+      </div>
+    `,
     iconSize: [0, 0],
     iconAnchor: [0, 0],
   });
@@ -73,12 +80,14 @@ function createDestinationIcon() {
 function createPOIIcon(type) {
   const isFuel = type === 'FUEL' || type === 'petrol';
   const emoji = isFuel ? '⛽' : '🏨';
-  const bg = isFuel ? '#e8f0fe' : '#f3e8fd';
-  const border = isFuel ? '#1a73e8' : '#7627bb';
 
   return L.divIcon({
     className: 'leaflet-poi-marker',
-    html: `<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;background:${bg};border:2px solid ${border};border-radius:50%;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,0.18);transform:translate(-50%,-50%);">${emoji}</div>`,
+    html: `
+      <div style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:#fff;border-radius:50%;font-size:12px;box-shadow:0 1px 3px rgba(60,64,67,0.3);transform:translate(-50%,-50%);">
+        ${emoji}
+      </div>
+    `,
     iconSize: [0, 0],
     iconAnchor: [0, 0],
   });
@@ -89,11 +98,53 @@ function createPOIIcon(type) {
 
 function MapCameraController({ mapFocus, trip, travelers, stops }) {
   const map = useMap();
+  const [isUserInteracting, setIsUserInteracting] = useState(false);
+  const interactionTimeoutRef = useRef(null);
+  const lastProcessedTimestamp = useRef(null);
+  const hasMountedFit = useRef(false);
+
+  // Track manual user zoom/pan to avoid fighting live updates
+  useMapEvents({
+    dragstart: () => {
+      setIsUserInteracting(true);
+      if (interactionTimeoutRef.current) clearTimeout(interactionTimeoutRef.current);
+    },
+    zoomstart: () => {
+      setIsUserInteracting(true);
+      if (interactionTimeoutRef.current) clearTimeout(interactionTimeoutRef.current);
+    },
+    dragend: () => {
+      interactionTimeoutRef.current = setTimeout(() => setIsUserInteracting(false), 4000);
+    },
+    zoomend: () => {
+      interactionTimeoutRef.current = setTimeout(() => setIsUserInteracting(false), 4000);
+    }
+  });
 
   useEffect(() => {
-    if (!mapFocus) return;
+    // Prevent recenter unless a new explicit action is triggered via mapFocus.timestamp,
+    // or if we have never fitted bounds on initial mount.
+    let shouldUpdateCamera = false;
+    const currentTimestamp = mapFocus?.timestamp || null;
 
-    if (mapFocus.fitGroup) {
+    if (currentTimestamp && currentTimestamp !== lastProcessedTimestamp.current) {
+      shouldUpdateCamera = true;
+      lastProcessedTimestamp.current = currentTimestamp;
+    } else if (!hasMountedFit.current && (travelers.length > 0 || trip)) {
+      // Allow initial fit on mount once we have some data
+      shouldUpdateCamera = true;
+    }
+
+    if (!shouldUpdateCamera) return;
+
+    if (isUserInteracting && hasMountedFit.current) {
+      // User is manually controlling map, do not interrupt
+      return;
+    }
+
+    const isFitGroup = mapFocus ? mapFocus.fitGroup : true;
+
+    if (isFitGroup) {
       const points = [];
       if (trip?.origin_lat) points.push([Number(trip.origin_lat), Number(trip.origin_lng)]);
       if (trip?.destination_lat) points.push([Number(trip.destination_lat), Number(trip.destination_lng)]);
@@ -107,13 +158,18 @@ function MapCameraController({ mapFocus, trip, travelers, stops }) {
           points.push([Number(st.latitude), Number(st.longitude)]);
         }
       });
+      
       if (points.length > 0) {
-        map.fitBounds(points, { padding: [50, 50], maxZoom: 14 });
+        console.log(`[MapCameraController] executing fitBounds (timestamp: ${currentTimestamp})`);
+        map.fitBounds(points, { padding: [50, 50], maxZoom: 14, animate: true, duration: 0.8 });
+        hasMountedFit.current = true;
       }
-    } else if (mapFocus.lat && mapFocus.lng) {
+    } else if (mapFocus && mapFocus.lat && mapFocus.lng) {
+      console.log(`[MapCameraController] executing flyTo (timestamp: ${currentTimestamp})`);
       map.flyTo([Number(mapFocus.lat), Number(mapFocus.lng)], mapFocus.zoom || 14, { duration: 0.8 });
+      hasMountedFit.current = true;
     }
-  }, [mapFocus, trip, travelers, stops, map]);
+  }, [mapFocus, trip, travelers, stops, map, isUserInteracting]);
 
   return null;
 }
@@ -144,6 +200,7 @@ function useOSRMRoute(origin, destination) {
           // GeoJSON is [lng, lat] — Leaflet needs [lat, lng]
           const coords = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
           setRouteCoords(coords);
+          useTripStore.getState().setRouteCoords(coords);
         }
       })
       .catch(err => {
@@ -153,26 +210,6 @@ function useOSRMRoute(origin, destination) {
 
   return routeCoords;
 }
-
-
-// ─── Fallback waypoint polyline (NH44/NH21 Delhi-Manali) ──────
-
-const FALLBACK_ROUTE_WAYPOINTS = [
-  [28.6315, 77.2167], // CP Delhi
-  [28.7365, 77.1510], // Mukarba Chowk
-  [29.0264, 77.0700], // Murthal
-  [29.2330, 77.0120], // Samalkha
-  [29.3909, 76.9635], // Panipat
-  [29.6857, 76.9905], // Karnal
-  [29.9695, 76.8783], // Kurukshetra
-  [30.3782, 76.7767], // Ambala
-  [30.7333, 76.7794], // Chandigarh
-  [31.1812, 76.5684], // Kiratpur
-  [31.3400, 76.7600], // Bilaspur
-  [31.7087, 76.9320], // Mandi
-  [31.9579, 77.1095], // Kullu
-  [32.2396, 77.1887], // Manali
-];
 
 
 // ─── Main Component ───────────────────────────────────────────
@@ -207,8 +244,8 @@ export function GoogleMapContainer(props = {}) {
   // Fetch REAL road route geometry from OSRM (free, no key needed)
   const osrmRoute = useOSRMRoute(origin, destination);
 
-  // Use OSRM road geometry if available, else use fallback waypoints
-  const routeCoords = osrmRoute || (origin && destination ? FALLBACK_ROUTE_WAYPOINTS : []);
+  // Use OSRM road geometry if available, else draw a straight line fallback
+  const routeCoords = osrmRoute || (origin && destination ? [[Number(origin.lat), Number(origin.lng)], [Number(destination.lat), Number(destination.lng)]] : []);
 
   // Initial center & zoom
   const center = useMemo(() => {
@@ -229,11 +266,16 @@ export function GoogleMapContainer(props = {}) {
         style={{ width: '100%', height: '100%' }}
         zoomControl={false}
         attributionControl={false}
+        zoomSnap={0.25}
+        zoomDelta={0.5}
+        wheelPxPerZoomLevel={100}
+        zoomAnimation={true}
+        markerZoomAnimation={true}
       >
-        {/* Real OpenStreetMap Tiles — real roads, real geography, real labels */}
+        {/* Real Google Maps aesthetic tiles via OSM + CSS Filter */}
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           maxZoom={19}
         />
 
@@ -248,13 +290,13 @@ export function GoogleMapContainer(props = {}) {
         {/* ─── ROUTE LAYER ─── */}
         {layerVisibility?.route && routeCoords.length > 0 && (
           <>
-            {/* Glow/shadow layer */}
+            {/* White casing stroke for contrast */}
             <Polyline
               positions={routeCoords}
               pathOptions={{
-                color: '#4285f4',
-                weight: 8,
-                opacity: 0.3,
+                color: '#ffffff',
+                weight: 10,
+                opacity: 0.9,
                 lineCap: 'round',
                 lineJoin: 'round',
               }}
@@ -264,14 +306,40 @@ export function GoogleMapContainer(props = {}) {
               positions={routeCoords}
               pathOptions={{
                 color: '#1a73e8',
-                weight: 5,
-                opacity: 0.85,
+                weight: 6,
+                opacity: 1,
                 lineCap: 'round',
                 lineJoin: 'round',
               }}
             />
           </>
         )}
+
+        {/* ─── CUSTOM TRAVELER ROUTES ─── */}
+        {layerVisibility?.route && travelers.map(t => {
+          if (!t.assigned_route_polyline) return null;
+          let coords = [];
+          try {
+            coords = JSON.parse(t.assigned_route_polyline);
+            if (!Array.isArray(coords)) return null;
+          } catch (e) {
+            return null;
+          }
+          return (
+            <Polyline
+              key={`route-${t.id}`}
+              positions={coords}
+              pathOptions={{
+                color: '#fbbc04', // Distinct color for alternative member routes
+                weight: 4,
+                opacity: 0.8,
+                lineCap: 'round',
+                lineJoin: 'round',
+                dashArray: '5, 5'
+              }}
+            />
+          );
+        })}
 
         {/* ─── ORIGIN MARKER ─── */}
         {origin && (
@@ -329,7 +397,7 @@ export function GoogleMapContainer(props = {}) {
                   </div>
                   <div style={{ marginBottom: '2px' }}>
                     <strong>Status:</strong>{' '}
-                    {isArrived ? '✓ Arrived' : isStopped ? '🛑 Stopped' : isSplit ? '⚠ Behind' : '🟢 Moving'}
+                    {isArrived ? '✓ Arrived' : isStopped ? '🛑 Stopped' : t.status === 'OFF_ROUTE' ? '⚠️ Off Route' : isSplit ? '⚠ Behind' : '🟢 Moving'}
                   </div>
                   <div style={{ marginBottom: '2px' }}>
                     <strong>Speed:</strong> {isArrived || isStopped ? '0' : Math.round(t.speed || 0)} km/h
@@ -464,8 +532,8 @@ export function GoogleMapContainer(props = {}) {
             <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-[#f1f3f4] text-xs">
               <div className="bg-[#f8f9fa] p-1.5 rounded-xl border border-[#dadce0] text-center">
                 <span className="text-[9px] text-[#5f6368] block font-medium">Status</span>
-                <span className={`font-bold text-[11px] ${isArrived ? 'text-[#137333]' : isStopped ? 'text-[#d93025]' : isSplit ? 'text-[#b06000]' : 'text-[#137333]'}`}>
-                  {isArrived ? '✓ Arrived' : isStopped ? 'Stopped' : isSplit ? 'Behind' : 'Moving'}
+                <span className={`font-bold text-[11px] ${isArrived ? 'text-[#137333]' : sel.status === 'OFF_ROUTE' ? 'text-[#c5221f]' : isStopped ? 'text-[#d93025]' : isSplit ? 'text-[#b06000]' : 'text-[#137333]'}`}>
+                  {isArrived ? '✓ Arrived' : sel.status === 'OFF_ROUTE' ? 'Off Route' : isStopped ? 'Stopped' : isSplit ? 'Behind' : 'Moving'}
                 </span>
               </div>
               <div className="bg-[#f8f9fa] p-1.5 rounded-xl border border-[#dadce0] text-center">
@@ -497,9 +565,14 @@ export function GoogleMapContainer(props = {}) {
                 )}
               </div>
             )}
-            {isSplit && (
+            {isSplit && sel.status !== 'OFF_ROUTE' && (
               <p className="text-[11px] text-[#b06000] font-semibold bg-[#fef7e0] px-2.5 py-1 rounded-xl">
                 {sel.distanceFromGroupKm ? `⚠ ${sel.distanceFromGroupKm} km behind convoy` : '⚠ Falling behind convoy'}
+              </p>
+            )}
+            {sel.status === 'OFF_ROUTE' && (
+              <p className="text-[11px] text-[#c5221f] font-semibold bg-[#fce8e6] px-2.5 py-1 rounded-xl">
+                ⚠️ Off assigned route
               </p>
             )}
             {isArrived && (
