@@ -102,9 +102,16 @@ export function CreateTrip() {
 
   // Recalculate route whenever valid origin & destination are provided
   useEffect(() => {
-    if (originLoc && destLoc && originLoc.lat && destLoc.lat) {
+    const normalizedOrigin = originLoc && Number.isFinite(Number(originLoc.lat)) && Number.isFinite(Number(originLoc.lng))
+      ? { ...originLoc, lat: Number(originLoc.lat), lng: Number(originLoc.lng) }
+      : null;
+    const normalizedDestination = destLoc && Number.isFinite(Number(destLoc.lat)) && Number.isFinite(Number(destLoc.lng))
+      ? { ...destLoc, lat: Number(destLoc.lat), lng: Number(destLoc.lng) }
+      : null;
+
+    if (normalizedOrigin && normalizedDestination) {
       setIsRouting(true);
-      fetch(`https://router.project-osrm.org/route/v1/driving/${originLoc.lng},${originLoc.lat};${destLoc.lng},${destLoc.lat}?overview=full&geometries=geojson&alternatives=3`)
+      fetch(`https://router.project-osrm.org/route/v1/driving/${normalizedOrigin.lng},${normalizedOrigin.lat};${normalizedDestination.lng},${normalizedDestination.lat}?overview=full&geometries=geojson&alternatives=3`)
         .then(res => res.json())
         .then(data => {
           if (data.code === 'Ok' && data.routes.length > 0) {
@@ -113,14 +120,15 @@ export function CreateTrip() {
               const mins = Math.round(r.duration / 60);
               const hrs = Math.floor(mins / 60);
               const remainingMins = mins % 60;
-              
+
               let summary = r.legs?.[0]?.summary || `Route Option ${index + 1}`;
               if (!summary || summary === '') {
                 summary = index === 0 ? 'Fastest Route' : `Alternative Route ${index}`;
               }
-              
-              // GeoJSON is [lng, lat] — we need [lat, lng] for Leaflet and backend tracking
-              const coords = r.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+
+              const coords = Array.isArray(r.geometry?.coordinates)
+                ? r.geometry.coordinates.map(([lng, lat]) => [lat, lng])
+                : [];
 
               return {
                 summary,
@@ -129,7 +137,7 @@ export function CreateTrip() {
                 polyline: JSON.stringify(coords)
               };
             });
-            
+
             setRouteAlternatives(alternatives);
             setSelectedRouteIndex(0);
             setDistance(alternatives[0].distance);
@@ -141,7 +149,7 @@ export function CreateTrip() {
           }
         })
         .catch(err => {
-          console.error("OSRM Route calculation failed", err);
+          console.error('OSRM Route calculation failed', err);
           setRouteAlternatives([]);
           setDistance('-- km');
           setDuration('-- h -- m');
@@ -209,7 +217,14 @@ export function CreateTrip() {
       setError('Please select or create a travel group first.');
       return;
     }
-    if (!originLoc || !destLoc) {
+    const normalizedOrigin = originLoc && Number.isFinite(Number(originLoc.lat)) && Number.isFinite(Number(originLoc.lng))
+      ? { ...originLoc, lat: Number(originLoc.lat), lng: Number(originLoc.lng) }
+      : null;
+    const normalizedDestination = destLoc && Number.isFinite(Number(destLoc.lat)) && Number.isFinite(Number(destLoc.lng))
+      ? { ...destLoc, lat: Number(destLoc.lat), lng: Number(destLoc.lng) }
+      : null;
+
+    if (!normalizedOrigin || !normalizedDestination) {
       setError('Please select valid origin and destination locations.');
       return;
     }
@@ -232,12 +247,12 @@ export function CreateTrip() {
       const data = await api.createTrip({
         group_id: groupId,
         name: tripName.trim(),
-        origin: originLoc.address.trim(),
-        destination: destLoc.address.trim(),
-        origin_lat: originLoc.lat,
-        origin_lng: originLoc.lng,
-        destination_lat: destLoc.lat,
-        destination_lng: destLoc.lng,
+        origin: normalizedOrigin.address.trim(),
+        destination: normalizedDestination.address.trim(),
+        origin_lat: normalizedOrigin.lat,
+        origin_lng: normalizedOrigin.lng,
+        destination_lat: normalizedDestination.lat,
+        destination_lng: normalizedDestination.lng,
         distance,
         estimated_duration: duration,
         route_polyline: routeAlternatives[selectedRouteIndex]?.polyline || ''

@@ -32,9 +32,14 @@ export default function LocationInput({
   
   const wrapperRef = useRef(null);
 
-  // Sync external value changes (e.g., presets applied)
+  // Sync external value changes (e.g., presets applied or map picker selection)
   useEffect(() => {
-    if (value?.address && value.address !== query) {
+    if (!value || !value.address) {
+      setQuery('');
+      return;
+    }
+
+    if (value.address !== query) {
       setQuery(value.address);
     }
   }, [value]);
@@ -84,15 +89,29 @@ export default function LocationInput({
   }, [debouncedQuery, value]);
 
   const handleInputChange = (e) => {
-    setQuery(e.target.value);
-    if (e.target.value === '') {
+    const nextValue = e.target.value;
+    setQuery(nextValue);
+
+    if (nextValue.trim() === '') {
       onChange(null);
+      return;
     }
+
+    if (value && value.address && nextValue === value.address) {
+      return;
+    }
+
+    // Keep the chosen value consistent while typing, but do not overwrite with a partial string.
+    onChange({
+      address: nextValue,
+      lat: value?.lat ?? null,
+      lng: value?.lng ?? null
+    });
   };
 
   const handleSelectSuggestion = (suggestion) => {
     const newLoc = {
-      address: suggestion.display_name,
+      address: String(suggestion.display_name || '').trim(),
       lat: Number(suggestion.lat),
       lng: Number(suggestion.lon)
     };
@@ -102,8 +121,13 @@ export default function LocationInput({
   };
 
   const handleMapPickerConfirm = (loc) => {
-    setQuery(loc.address);
-    onChange(loc);
+    const normalizedLoc = {
+      address: String(loc?.address || '').trim(),
+      lat: Number(loc?.lat),
+      lng: Number(loc?.lng)
+    };
+    setQuery(normalizedLoc.address);
+    onChange(normalizedLoc);
   };
 
   return (
