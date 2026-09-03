@@ -144,6 +144,10 @@ export const tripController = {
         .filter(e => e.trip_id === tripId)
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
+      const chatMessages = db.tables.get('chat_messages')
+        .filter(message => message.trip_id === tripId)
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
       return res.json({
         trip,
         group,
@@ -151,7 +155,8 @@ export const tripController = {
         members,
         liveLocations,
         stops,
-        events
+        events,
+        chatMessages
       });
     } catch (err) {
       console.error('[Trip] Get details error:', err);
@@ -263,6 +268,7 @@ export const tripController = {
         created_at: endedAt
       };
       db.tables.insert('trip_events', endEvent);
+      db.tables.delete('chat_messages', message => message.trip_id === tripId);
 
       return res.json({
         message: 'Trip completed successfully',
@@ -380,6 +386,43 @@ export const tripController = {
       });
     } catch (err) {
       return res.status(500).json({ error: 'Failed to fetch user trips.' });
+    }
+  },
+
+  async getRecommendedTrips(req, res) {
+    try {
+      const cutoff = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      const routeMap = new Map();
+
+      db.tables.get('trips')
+        .filter(trip => {
+          const createdAt = new Date(trip.created_at || trip.started_at || 0).getTime();
+          return Number.isFinite(createdAt) && createdAt >= cutoff;
+        })
+        .sort((a, b) => new Date(b.created_at || b.started_at) - new Date(a.created_at || a.started_at))
+        .forEach(trip => {
+          const routeKey = `${trip.origin}|${trip.destination}`.toLowerCase();
+          if (!routeMap.has(routeKey)) {
+            routeMap.set(routeKey, {
+              id: trip.id,
+              name: trip.name,
+              origin: trip.origin,
+              destination: trip.destination,
+              origin_lat: trip.origin_lat,
+              origin_lng: trip.origin_lng,
+              destination_lat: trip.destination_lat,
+              destination_lng: trip.destination_lng,
+              distance: trip.distance,
+              estimated_duration: trip.estimated_duration,
+              created_at: trip.created_at
+            });
+          }
+        });
+
+      return res.json({ recommendations: Array.from(routeMap.values()).slice(0, 6) });
+    } catch (err) {
+      console.error('[Trip] Recommendations error:', err);
+      return res.status(500).json({ error: 'Failed to fetch trip recommendations.' });
     }
   },
 

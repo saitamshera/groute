@@ -8,6 +8,7 @@ const router = Router();
 router.use(authenticateToken);
 
 router.get('/active', tripController.getUserActiveTrips);
+router.get('/recommended', tripController.getRecommendedTrips);
 router.post('/', validate(createTripSchema), tripController.createTrip);
 router.get('/:tripId', tripController.getTripDetails);
 router.post('/:tripId/start', tripController.startTrip);

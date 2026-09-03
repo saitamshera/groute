@@ -137,3 +137,15 @@ CREATE TABLE IF NOT EXISTS trip_events (
 CREATE INDEX IF NOT EXISTS idx_trip_events_trip ON trip_events(trip_id);
 CREATE INDEX IF NOT EXISTS idx_trip_events_type ON trip_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_trip_events_created ON trip_events(created_at DESC);
+
+-- 9. Trip Chat Messages
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id VARCHAR(64) PRIMARY KEY DEFAULT uuid_generate_v4()::text,
+    trip_id VARCHAR(64) REFERENCES trips(id) ON DELETE CASCADE,
+    user_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+    user_name VARCHAR(255) NOT NULL,
+    text TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_messages_trip ON chat_messages(trip_id, created_at);

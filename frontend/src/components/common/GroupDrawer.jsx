@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Users, Clock, ChevronDown, ChevronUp, X, ChevronsUp, ChevronsDown } from 'lucide-react';
+import { Users, Clock, MessageCircle, ChevronDown, ChevronUp, X, ChevronsUp, ChevronsDown, GripVertical, GripHorizontal } from 'lucide-react';
 import useTripStore, { selectTravelers } from '../../store/tripStore.js';
 import useAuthStore from '../../store/authStore.js';
 import MemberList from '../members/MemberList.jsx';
 import TripTimeline from '../timeline/TripTimeline.jsx';
+import ChatPanel from './ChatPanel.jsx';
 
 export function GroupDrawer() {
   const {
@@ -20,6 +21,8 @@ export function GroupDrawer() {
   const { user } = useAuthStore();
   // 3 Mobile sheet states: 'COLLAPSED', 'PARTIAL', 'FULL'
   const [mobileSheetState, setMobileSheetState] = useState('COLLAPSED');
+  const [drawerSize, setDrawerSize] = useState({ width: 380, height: null });
+  const resizeStart = React.useRef(null);
 
   const travelers = selectTravelers(members, liveLocations, user?.id, trip?.destination);
   const leaderTraveler = travelers.find(t => t.isLeader);
@@ -34,11 +37,52 @@ export function GroupDrawer() {
     else setMobileSheetState('COLLAPSED');
   };
 
+  const startResize = (event, direction) => {
+    event.preventDefault();
+    event.stopPropagation();
+    resizeStart.current = {
+      direction,
+      x: event.clientX,
+      y: event.clientY,
+      width: drawerSize.width,
+      height: drawerSize.height || window.innerHeight - 106
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const resizeDrawer = (event) => {
+    const start = resizeStart.current;
+    if (!start) return;
+    const nextSize = { ...drawerSize };
+    if (start.direction === 'width') {
+      nextSize.width = Math.min(560, Math.max(320, start.width + start.x - event.clientX));
+    } else {
+      nextSize.height = Math.min(window.innerHeight - 106, Math.max(260, start.height + event.clientY - start.y));
+    }
+    setDrawerSize(nextSize);
+  };
+
+  const stopResize = () => {
+    resizeStart.current = null;
+  };
+
+  const renderContent = () => {
+    if (activeDrawerTab === 'TIMELINE') return <TripTimeline />;
+    if (activeDrawerTab === 'CHAT') return <ChatPanel />;
+    return <MemberList />;
+  };
+
   return (
     <>
       {/* 1. DESKTOP FLOATING DRAWER (Right side of screen over the map) */}
       {isDrawerOpen && (
-        <div className="hidden md:flex absolute top-[90px] right-4 bottom-4 z-40 w-[380px] flex-col bg-white border border-[#dadce0] rounded-3xl shadow-xl overflow-hidden pointer-events-auto animate-in fade-in slide-in-from-right-4 duration-200">
+        <div style={{ width: `${drawerSize.width}px`, ...(drawerSize.height ? { height: `${drawerSize.height}px`, bottom: 'auto' } : {}) }} className="hidden md:flex absolute top-[90px] right-4 bottom-4 z-40 max-w-[calc(100vw-2rem)] min-w-[320px] min-h-[260px] flex-col bg-white border border-[#dadce0] rounded-3xl shadow-xl overflow-visible pointer-events-auto animate-in fade-in slide-in-from-right-4 duration-200">
+          <button type="button" onPointerDown={(event) => startResize(event, 'width')} onPointerMove={resizeDrawer} onPointerUp={stopResize} className="absolute top-1/2 -left-3 z-10 w-6 h-12 -translate-y-1/2 rounded-full bg-white border border-[#dadce0] shadow-sm text-[#9aa0a6] hover:text-[#1a73e8] flex items-center justify-center cursor-ew-resize" title="Resize panel width" aria-label="Resize panel width">
+            <GripVertical className="w-3.5 h-3.5" />
+          </button>
+          <button type="button" onPointerDown={(event) => startResize(event, 'height')} onPointerMove={resizeDrawer} onPointerUp={stopResize} className="absolute -top-3 left-1/2 z-10 w-12 h-6 -translate-x-1/2 rounded-full bg-white border border-[#dadce0] shadow-sm text-[#9aa0a6] hover:text-[#1a73e8] flex items-center justify-center cursor-ns-resize" title="Resize panel height" aria-label="Resize panel height">
+            <GripHorizontal className="w-3.5 h-3.5" />
+          </button>
           {/* Navigation Tabs Header */}
           <div className="p-3 border-b border-[#dadce0] bg-[#f8f9fa] flex flex-col gap-2">
             <div className="flex items-center justify-between">
@@ -53,6 +97,16 @@ export function GroupDrawer() {
                 >
                   <Users className="w-3.5 h-3.5" />
                   <span>Travelers ({travelers.length})</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveDrawerTab('CHAT')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold transition-all ${
+                    activeDrawerTab === 'CHAT' ? 'bg-white text-[#1a73e8] shadow-sm' : 'text-[#5f6368] hover:text-[#202124]'
+                  }`}
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>Chat</span>
                 </button>
 
                 <button
@@ -89,7 +143,7 @@ export function GroupDrawer() {
 
           {/* Tab Content */}
           <div className="flex-1 overflow-hidden relative">
-            {activeDrawerTab === 'MEMBERS' ? <MemberList /> : <TripTimeline />}
+            {renderContent()}
           </div>
         </div>
       )}
@@ -149,6 +203,15 @@ export function GroupDrawer() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    setActiveDrawerTab('CHAT');
+                  }}
+                  className={`px-2 py-0.5 rounded-full font-bold ${activeDrawerTab === 'CHAT' ? 'bg-[#1a73e8] text-white' : 'text-[#5f6368]'}`}
+                >
+                  Chat
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setActiveDrawerTab('TIMELINE');
                   }}
                   className={`px-2 py-0.5 rounded-full font-bold ${
@@ -182,7 +245,7 @@ export function GroupDrawer() {
         {/* Sheet Content when Partial or Full */}
         {mobileSheetState !== 'COLLAPSED' && (
           <div className="flex-1 overflow-y-auto">
-            {activeDrawerTab === 'MEMBERS' ? <MemberList /> : <TripTimeline />}
+            {renderContent()}
           </div>
         )}
       </div>

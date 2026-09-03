@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation, Link } from 'react-router-dom';
 import { Navigation, MapPin, Calendar, Clock, ArrowRight, ArrowLeft, Route, Check, Plus, UserPlus, Sparkles } from 'lucide-react';
 import api from '../services/api.js';
 import useTripStore from '../store/tripStore.js';
@@ -46,6 +46,7 @@ const tripPresets = [
 
 export function CreateTrip() {
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const initialGroupId = searchParams.get('group') || '';
   const navigate = useNavigate();
 
@@ -77,6 +78,15 @@ export function CreateTrip() {
 
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isJoinGroupOpen, setIsJoinGroupOpen] = useState(false);
+
+  useEffect(() => {
+    const recommendation = location.state?.recommendation;
+    if (!recommendation) return;
+
+    setTripName(recommendation.name || 'Recommended Road Trip');
+    setOriginLoc({ address: recommendation.origin, lat: recommendation.origin_lat, lng: recommendation.origin_lng });
+    setDestLoc({ address: recommendation.destination, lat: recommendation.destination_lat, lng: recommendation.destination_lng });
+  }, [location.state]);
 
   const fetchGroups = async () => {
     setIsLoadingGroups(true);

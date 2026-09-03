@@ -21,7 +21,8 @@ const COLLECTION_NAMES = [
   'trip_members',
   'locations',
   'stops',
-  'trip_events'
+  'trip_events',
+  'chat_messages'
 ];
 
 const initialLocalDb = {
@@ -32,7 +33,8 @@ const initialLocalDb = {
   trip_members: [],
   locations: [],
   stops: [],
-  trip_events: []
+  trip_events: [],
+  chat_messages: []
 };
 
 let localDbCache = null;

@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Sparkles,
   Search,
-  ArrowRight
+  ArrowRight,
+  Compass
 } from 'lucide-react';
 import api from '../services/api.js';
 import useAuthStore from '../store/authStore.js';
@@ -27,6 +28,7 @@ export function Dashboard() {
   const [groups, setGroups] = useState([]);
   const [activeTrips, setActiveTrips] = useState([]);
   const [recentTrips, setRecentTrips] = useState([]);
+  const [recommendedTrips, setRecommendedTrips] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -36,13 +38,15 @@ export function Dashboard() {
   const loadDashboardData = async () => {
     setIsLoading(true);
     try {
-      const [groupsRes, tripsRes] = await Promise.all([
+      const [groupsRes, tripsRes, recommendationsRes] = await Promise.all([
         api.getGroups(),
-        api.getActiveTrips()
+        api.getActiveTrips(),
+        api.getRecommendedTrips()
       ]);
       setGroups(groupsRes.groups || []);
       setActiveTrips(tripsRes.activeTrips || []);
       setRecentTrips(tripsRes.recentTrips || []);
+      setRecommendedTrips(recommendationsRes.recommendations || []);
     } catch (err) {
       console.error('[Dashboard] Data load error:', err);
     } finally {
@@ -309,6 +313,44 @@ export function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
         {/* Your Groups */}
         <div className="space-y-4">
+          <div className="flex items-center justify-between pl-1">
+            <div className="flex items-center gap-1.5">
+              <Compass className="w-4 h-4 text-[#1a73e8]" />
+              <h2 className="text-xs font-bold uppercase tracking-wider text-[#5f6368]">
+                Recommended Trips
+              </h2>
+            </div>
+            <span className="text-[10px] font-bold text-[#5f6368]">Last 30 days</span>
+          </div>
+
+          {recommendedTrips.length === 0 ? (
+            <div className="bg-white rounded-xl p-6 text-center text-[#5f6368] text-sm shadow-[0_1px_2px_0_rgba(60,64,67,0.3),0_1px_3px_1px_rgba(60,64,67,0.15)]">
+              No new routes to recommend yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recommendedTrips.map((recommendation) => (
+                <div key={recommendation.id} className="bg-white p-4 rounded-xl shadow-[0_1px_2px_0_rgba(60,64,67,0.3),0_1px_3px_1px_rgba(60,64,67,0.15)]">
+                  <h4 className="text-sm font-bold text-[#202124] truncate">{recommendation.name}</h4>
+                  <p className="text-[12px] text-[#5f6368] truncate mt-1">
+                    {recommendation.origin} → {recommendation.destination}
+                  </p>
+                  <div className="flex items-center justify-between gap-2 mt-3">
+                    <span className="text-[10px] font-semibold text-[#5f6368]">
+                      {recommendation.distance || 'Distance unavailable'} · {recommendation.estimated_duration || 'Duration unavailable'}
+                    </span>
+                    <button
+                      onClick={() => navigate('/trips/new', { state: { recommendation } })}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#e8f0fe] text-[#1a73e8] text-[10px] font-bold hover:bg-[#d2e3fc]"
+                    >
+                      Plan route <ArrowRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="flex items-center justify-between pl-1">
             <div className="flex items-center gap-1.5">
               <Users className="w-4 h-4 text-[#1a73e8]" />

@@ -67,6 +67,19 @@ export function setupSockets(io) {
       const currentLocations = await redisStore.hgetall(`trip:${tripId}:locations`);
       socket.emit('locations:snapshot', { locations: currentLocations });
 
+      const chatMessages = db.tables.get('chat_messages')
+        .filter(message => message.trip_id === tripId)
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+        .slice(-100)
+        .map(message => ({
+          id: message.id,
+          userId: message.user_id,
+          userName: message.user_name,
+          text: message.text,
+          createdAt: message.created_at
+        }));
+      socket.emit('chat:history', { messages: chatMessages });
+
       // Notify others in the room
       socket.to(roomName).emit('member:joined', {
         user: {
@@ -88,6 +101,29 @@ export function setupSockets(io) {
         userId: user.id,
         name: user.name,
         timestamp: new Date().toISOString()
+      });
+    });
+
+    socket.on('chat:send', ({ tripId, text }) => {
+      const cleanText = typeof text === 'string' ? text.trim() : '';
+      if (!tripId || tripId !== socket.currentTripId || !cleanText) return;
+
+      const message = {
+        id: `${socket.id}-${Date.now()}`,
+        trip_id: tripId,
+        user_id: user.id,
+        user_name: user.name,
+        text: cleanText.slice(0, 500),
+        created_at: new Date().toISOString()
+      };
+      db.tables.insert('chat_messages', message);
+
+      io.to(`trip:${tripId}`).emit('chat:message', {
+        id: message.id,
+        userId: user.id,
+        userName: user.name,
+        text: message.text,
+        createdAt: message.created_at
       });
     });
 

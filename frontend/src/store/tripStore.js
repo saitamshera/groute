@@ -256,6 +256,7 @@ export const useTripStore = create((set, get) => ({
   stops: [],
   pois: [],
   events: [],
+  chatMessages: [],
   groupCenter: null,
   groupEta: { formattedEta: 'Calculating...', totalMinutes: 0 },
   routeCoords: [], // Fetched polyline geometry for the map and simulation
@@ -273,7 +274,7 @@ export const useTripStore = create((set, get) => ({
   mapFocus: null, // { lat, lng, zoom, fitGroup, targetId, timestamp }
   layerVisibility: { route: true, stops: true, members: true, petrol: true, hotels: true },
   isDrawerOpen: true,
-  activeDrawerTab: 'MEMBERS', // 'MEMBERS' | 'TIMELINE'
+  activeDrawerTab: 'MEMBERS', // 'MEMBERS' | 'TIMELINE' | 'CHAT'
 
   // Simulation mode states
   isSimulationActive: false,
@@ -298,6 +299,7 @@ export const useTripStore = create((set, get) => ({
         stops: data.stops || [],
         pois: (poisRes && Array.isArray(poisRes.pois)) ? poisRes.pois : [],
         events: data.events || [],
+        chatMessages: data.chatMessages || [],
         isLoadingTrip: false
       });
       return data;
@@ -556,6 +558,10 @@ export const useTripStore = create((set, get) => ({
 
   setDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
   setActiveDrawerTab: (tab) => set({ activeDrawerTab: tab, isDrawerOpen: tab !== null }),
+  addChatMessage: (message) => set((state) => ({
+    chatMessages: [...state.chatMessages, message].slice(-100)
+  })),
+  setChatMessages: (messages) => set({ chatMessages: messages.slice(-100) }),
 
   toggleLocationSharing: () => {
     const nextVal = !get().isSharingLocation;
@@ -584,6 +590,7 @@ export const useTripStore = create((set, get) => ({
     stops: [],
     pois: [],
     events: [],
+    chatMessages: [],
     groupCenter: null,
     groupEta: { formattedEta: 'Calculating...', totalMinutes: 0 },
     routeCoords: [],

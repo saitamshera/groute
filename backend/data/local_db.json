@@ -240026,6 +240026,306 @@
       "speed": 0,
       "heading": 0,
       "recorded_at": "2026-09-01T11:29:04.743Z"
+    },
+    {
+      "id": "275ce7d3-818e-4891-9b73-02e0adbb69cb",
+      "created_at": "2026-09-03T19:10:01.073Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:10:01.059Z"
+    },
+    {
+      "id": "956c4c30-625e-4090-a8f1-a3acaaf9cc23",
+      "created_at": "2026-09-03T19:10:13.650Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "2974a157-5fe5-4f62-b33f-d5282610b7c4",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:10:13.644Z"
+    },
+    {
+      "id": "daa2aa7e-f478-407d-8081-a1ed1ec5f435",
+      "created_at": "2026-09-03T19:11:51.244Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "2974a157-5fe5-4f62-b33f-d5282610b7c4",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:11:51.242Z"
+    },
+    {
+      "id": "e28519c9-ca8a-4c42-87a6-818a9c2872b3",
+      "created_at": "2026-09-03T19:16:07.846Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:16:07.841Z"
+    },
+    {
+      "id": "0352f6e4-b025-4d30-ab60-00db7dd34e4c",
+      "created_at": "2026-09-03T19:16:22.715Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "2974a157-5fe5-4f62-b33f-d5282610b7c4",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:16:22.714Z"
+    },
+    {
+      "id": "d1a26201-24f7-40b4-92fe-8966dd38d94e",
+      "created_at": "2026-09-03T19:17:10.452Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:17:10.452Z"
+    },
+    {
+      "id": "35e8f81b-aa66-4922-8b55-be6060514f49",
+      "created_at": "2026-09-03T19:17:31.171Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.6535875,
+      "longitude": 77.02835575,
+      "accuracy": 381,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:17:31.170Z"
+    },
+    {
+      "id": "25143de7-637b-4867-bacc-ecd92798b3b5",
+      "created_at": "2026-09-03T19:19:00.100Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.6535875,
+      "longitude": 77.02835575,
+      "accuracy": 381,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:19:00.095Z"
+    },
+    {
+      "id": "e70aeb3b-7c4f-4730-9c06-1d337b2b34b7",
+      "created_at": "2026-09-03T19:19:00.242Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "2974a157-5fe5-4f62-b33f-d5282610b7c4",
+      "latitude": 28.6535875,
+      "longitude": 77.02835575,
+      "accuracy": 381,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:19:00.095Z"
+    },
+    {
+      "id": "22e840c5-2f8b-4883-9f95-9e7f6a3962b3",
+      "created_at": "2026-09-03T19:19:46.144Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "2974a157-5fe5-4f62-b33f-d5282610b7c4",
+      "latitude": 28.6535875,
+      "longitude": 77.02835575,
+      "accuracy": 381,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:19:25.408Z"
+    },
+    {
+      "id": "4d148e1a-33bb-415a-9ece-67853d51cf4c",
+      "created_at": "2026-09-03T19:19:46.228Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "2974a157-5fe5-4f62-b33f-d5282610b7c4",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:19:32.147Z"
+    },
+    {
+      "id": "faf70eff-0c3d-49a9-b289-40fa7a12cc26",
+      "created_at": "2026-09-03T19:19:46.273Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "2974a157-5fe5-4f62-b33f-d5282610b7c4",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:19:44.020Z"
+    },
+    {
+      "id": "6a06b1c6-9b78-4a04-b74f-b500db9d4bbe",
+      "created_at": "2026-09-03T19:19:46.330Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.6535875,
+      "longitude": 77.02835575,
+      "accuracy": 381,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:19:25.407Z"
+    },
+    {
+      "id": "68ac56ba-ad60-4008-868a-67315a6d1db4",
+      "created_at": "2026-09-03T19:19:46.377Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:19:32.136Z"
+    },
+    {
+      "id": "6f5d5d4a-fc12-4bad-9a79-d16e1e40ca85",
+      "created_at": "2026-09-03T19:19:46.427Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:19:44.020Z"
+    },
+    {
+      "id": "9a081362-9496-459a-844a-e93a6004a1c6",
+      "created_at": "2026-09-03T19:20:09.793Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:20:09.793Z"
+    },
+    {
+      "id": "75cd34df-a224-479a-bc89-5c07f9f6f21a",
+      "created_at": "2026-09-03T19:20:14.929Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.6535875,
+      "longitude": 77.02835575,
+      "accuracy": 381,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:20:14.929Z"
+    },
+    {
+      "id": "cbb4670e-be16-44a9-ae64-7eac5dd342c4",
+      "created_at": "2026-09-03T19:20:31.283Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.6535875,
+      "longitude": 77.02835575,
+      "accuracy": 381,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:20:31.276Z"
+    },
+    {
+      "id": "a2559de1-623d-4b25-a280-1d1e72022378",
+      "created_at": "2026-09-03T19:21:02.546Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "2974a157-5fe5-4f62-b33f-d5282610b7c4",
+      "latitude": 28.6535875,
+      "longitude": 77.02835575,
+      "accuracy": 381,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:21:02.545Z"
+    },
+    {
+      "id": "6fdd43f6-afc1-4bdd-860c-eab285c4df1c",
+      "created_at": "2026-09-03T19:21:03.135Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.6535875,
+      "longitude": 77.02835575,
+      "accuracy": 381,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:21:03.135Z"
+    },
+    {
+      "id": "a299a04e-28ad-40ab-8e41-26c763f3e87a",
+      "created_at": "2026-09-03T19:21:08.640Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "2974a157-5fe5-4f62-b33f-d5282610b7c4",
+      "latitude": 28.6535875,
+      "longitude": 77.02835575,
+      "accuracy": 381,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:21:08.621Z"
+    },
+    {
+      "id": "c5c89a6e-c742-4d79-b841-8515c393909a",
+      "created_at": "2026-09-03T19:21:26.965Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.6535875,
+      "longitude": 77.02835575,
+      "accuracy": 381,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:21:26.963Z"
+    },
+    {
+      "id": "b42279bc-373c-4a9b-88dd-534e3b593b73",
+      "created_at": "2026-09-03T19:22:19.843Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "2974a157-5fe5-4f62-b33f-d5282610b7c4",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:22:19.841Z"
+    },
+    {
+      "id": "de2c8245-2852-4a63-aae2-456270e62d88",
+      "created_at": "2026-09-03T19:25:03.078Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:24:56.132Z"
+    },
+    {
+      "id": "cf733f64-7edc-46bb-b65f-82203c73fe9b",
+      "created_at": "2026-09-03T19:25:49.614Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "latitude": 28.653634,
+      "longitude": 77.028353,
+      "accuracy": 500,
+      "speed": 0,
+      "heading": 0,
+      "recorded_at": "2026-09-03T19:25:49.612Z"
     }
   ],
   "stops": [
@@ -241438,6 +241738,16 @@
         "distanceKm": 0.1,
         "message": "Karan has rejoined the convoy"
       }
+    }
+  ],
+  "chat_messages": [
+    {
+      "id": "tAEzLsOlfnsUFrSsAAAD-1788463228496",
+      "created_at": "2026-09-03T19:20:28.496Z",
+      "trip_id": "b4261228-5f65-47c5-bcb1-4838a6e72a7c",
+      "user_id": "ff435dd7-f145-4c90-94a8-d7b5f4609970",
+      "user_name": "dk",
+      "text": "hellow"
     }
   ]
 }

@@ -39,6 +39,7 @@ export const api = {
 
   // Trips
   getActiveTrips: () => request('/api/trips/active'),
+  getRecommendedTrips: () => request('/api/trips/recommended'),
   createTrip: (body) => request('/api/trips', { method: 'POST', body: JSON.stringify(body) }),
   getTripDetails: (tripId) => request(`/api/trips/${tripId}`),
   startTrip: (tripId) => request(`/api/trips/${tripId}/start`, { method: 'POST' }),

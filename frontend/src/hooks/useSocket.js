@@ -11,7 +11,9 @@ export function useSocket(tripId) {
     addStop,
     updateStop,
     updateMemberStatus,
-    setConnectionStatus
+    setConnectionStatus,
+    addChatMessage,
+    setChatMessages
   } = useTripStore();
 
   useEffect(() => {
@@ -101,6 +103,14 @@ export function useSocket(tripId) {
       }
     }
 
+    function onChatMessage(message) {
+      if (message) addChatMessage(message);
+    }
+
+    function onChatHistory(data) {
+      if (data && Array.isArray(data.messages)) setChatMessages(data.messages);
+    }
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('reconnect_attempt', onReconnectAttempt);
@@ -112,6 +122,8 @@ export function useSocket(tripId) {
     socket.on('stop:started', onStopStarted);
     socket.on('stop:ended', onStopEnded);
     socket.on('member:status_changed', onMemberStatusChanged);
+    socket.on('chat:message', onChatMessage);
+    socket.on('chat:history', onChatHistory);
 
     if (socket.connected) {
       socket.emit('join_trip', { tripId });
@@ -132,6 +144,8 @@ export function useSocket(tripId) {
       socket.off('stop:started', onStopStarted);
       socket.off('stop:ended', onStopEnded);
       socket.off('member:status_changed', onMemberStatusChanged);
+      socket.off('chat:message', onChatMessage);
+      socket.off('chat:history', onChatHistory);
     };
   }, [tripId]);
 }
